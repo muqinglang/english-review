@@ -1,0 +1,20 @@
+# Local learning data and generated review material
+ledger.json
+reviews/
+*.audio.json
+
+# Local runtime files and secrets
+.env
+.env.local
+.env.*.local
+worker-cache/
+*.log
+
+# Dependencies and framework output
+node_modules/
+.next/
+out/
+
+# OS/editor files
+.DS_Store
+Thumbs.db

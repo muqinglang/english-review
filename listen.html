@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>English Review — Sound Cards</title>
+  <style>
+    :root { color-scheme: light; font-family: "Segoe UI", system-ui, sans-serif; color: #172033; background: #f6f8fc; }
+    body { max-width: 820px; margin: 0 auto; padding: 30px 18px 54px; }
+    h1 { margin: 0 0 8px; font-size: 1.7rem; } p { line-height: 1.55; }
+    .panel, .card { background: #fff; border: 1px solid #e0e6f0; border-radius: 14px; box-shadow: 0 4px 18px #24324a0d; }
+    .panel { padding: 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 20px 0; }
+    label { font-weight: 600; } input, select, button { font: inherit; border-radius: 8px; padding: 8px 10px; border: 1px solid #b9c5d8; background: #fff; }
+    button { border: 0; color: #fff; background: #1769e0; cursor: pointer; font-weight: 650; } button:hover { background: #0d55bd; }
+    button.secondary { background: #eaf1ff; color: #174c9b; } button.stop { background: #fbecec; color: #a32727; }
+    #status { min-height: 1.4em; color: #56657c; }
+    .card { padding: 18px; margin: 14px 0; } .number { color: #1769e0; font-weight: 750; }
+    .prompt { font-size: 1.06rem; margin: 7px 0 13px; } .answer { display: none; padding: 12px; background: #f2f6fe; border-radius: 9px; font-size: 1.05rem; line-height: 1.45; }
+    .controls { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 12px; }
+    .tip { font-size: .94rem; color: #526178; }
+  </style>
+</head>
+<body>
+  <h1>🔊 English Sound Cards</h1>
+  <p>Think first, reveal the answer, then listen and repeat. The reader speaks English only.</p>
+  <div class="panel">
+    <label for="date">Review date</label><input id="date" type="date">
+    <label for="voice">Voice</label><select id="voice"><option>Loading voices…</option></select>
+    <button id="load">Load cards</button><button id="stop" class="stop">Stop audio</button>
+  </div>
+  <p id="status" aria-live="polite"></p>
+  <main id="cards"></main>
+  <p class="tip">Suggested loop: think for 5 seconds → reveal → normal speed → slow speed → repeat aloud three times.</p>
+  <script>
+    const queryDate = new URLSearchParams(location.search).get('date');
+    const dateInput = document.querySelector('#date');
+    const voiceSelect = document.querySelector('#voice');
+    const cardsEl = document.querySelector('#cards');
+    const statusEl = document.querySelector('#status');
+    dateInput.value = queryDate || new Date().toISOString().slice(0, 10);
+    let voices = [];
+
+    function loadVoices() {
+      voices = speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().startsWith('en'));
+      voiceSelect.innerHTML = '';
+      if (!voices.length) { voiceSelect.innerHTML = '<option>No English voice found</option>'; return; }
+      voices.forEach((voice, index) => {
+        const option = new Option(`${voice.name} (${voice.lang})`, index);
+        if (/en-us/i.test(voice.lang) && index === 0) option.selected = true;
+        voiceSelect.add(option);
+      });
+    }
+    speechSynthesis.onvoiceschanged = loadVoices; loadVoices();
+
+    function speak(text, rate, repeats = 1) {
+      speechSynthesis.cancel();
+      const selected = voices[Number(voiceSelect.value)] || voices[0];
+      for (let i = 0; i < repeats; i++) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = selected?.lang || 'en-US'; utterance.voice = selected || null; utterance.rate = rate;
+        speechSynthesis.speak(utterance);
+      }
+    }
+
+    function render(data) {
+      cardsEl.replaceChildren();
+      data.cards.forEach((card, index) => {
+        const article = document.createElement('article'); article.className = 'card';
+        article.innerHTML = `<span class="number">${index + 1}</span><p class="prompt">${card.prompt}</p><div class="answer">${card.normal}</div><div class="controls"><button class="reveal secondary">Show answer</button><button class="normal">Normal</button><button class="slow secondary">Slow</button><button class="repeat secondary">Repeat ×3</button></div>`;
+        article.querySelector('.reveal').onclick = event => { article.querySelector('.answer').style.display = 'block'; event.currentTarget.textContent = 'Answer shown'; };
+        article.querySelector('.normal').onclick = () => speak(card.normal, 0.95);
+        article.querySelector('.slow').onclick = () => speak(card.slow || card.normal, 0.7);
+        article.querySelector('.repeat').onclick = () => speak(card.normal, 0.85, 3);
+        cardsEl.append(article);
+      });
+      statusEl.textContent = `${data.cards.length} sound cards loaded for ${data.date}.`;
+    }
+
+    async function loadCards() {
+      speechSynthesis.cancel(); const date = dateInput.value;
+      if (!date) return; statusEl.textContent = 'Loading…';
+      try {
+        const response = await fetch(`reviews/${date}.audio.json`, { cache: 'no-store' });
+        if (!response.ok) throw new Error('not found'); render(await response.json());
+      } catch { cardsEl.replaceChildren(); statusEl.textContent = `No audio cards found for ${date}. Generate that day's review first.`; }
+    }
+    document.querySelector('#load').onclick = loadCards;
+    document.querySelector('#stop').onclick = () => speechSynthesis.cancel();
+    loadCards();
+  </script>
+</body>
+</html>
