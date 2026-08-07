@@ -2,7 +2,8 @@ param(
   [string]$Token,
   [Parameter(Mandatory = $true)][string]$ItemsFile,
   [string]$ApiBase = "https://english-review-three.vercel.app",
-  [string]$TokenFile = (Join-Path $PSScriptRoot ".worker-token.clixml")
+  [string]$TokenFile = (Join-Path $PSScriptRoot ".worker-token.clixml"),
+  [int]$TimeoutSec = 30
 )
 
 function ConvertFrom-WorkerSecureString {
@@ -32,7 +33,16 @@ if ([string]::IsNullOrWhiteSpace($Token)) {
 
 $body = Get-Content -Raw -Encoding UTF8 $ItemsFile
 try {
-  Invoke-RestMethod -Method Post -Uri "$ApiBase/api/worker/push" -Headers @{ Authorization = "Bearer $Token" } -ContentType "application/json" -Body $body
+  Write-Verbose "Sending Worker payload to $ApiBase/api/worker/push"
+  Invoke-RestMethod -Method Post -Uri "$ApiBase/api/worker/push" -Headers @{ Authorization = "Bearer $Token" } -ContentType "application/json; charset=utf-8" -Body $body -TimeoutSec $TimeoutSec -ErrorAction Stop
+}
+catch [Net.WebException] {
+  $responseBody = ""
+  if ($_.Exception.Response) {
+    $reader = New-Object IO.StreamReader($_.Exception.Response.GetResponseStream())
+    try { $responseBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
+  }
+  throw "Worker API request failed: $responseBody"
 }
 finally {
   $Token = $null

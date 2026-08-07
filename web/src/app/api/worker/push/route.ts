@@ -30,9 +30,11 @@ export async function POST(request: Request) {
   }
   if (review) {
     const cards = review.audioCards ?? [];
-    const validDate = /^\d{4}-\d{2}-\d{2}$/.test(review.reviewDate);
-    const validCards = Array.isArray(cards) && cards.length <= 50 && cards.every((card) => card.id && card.prompt && card.normal);
-    if (!validDate || !review.title?.trim() || !review.contentMarkdown?.trim() || review.contentMarkdown.length > 100_000 || !validCards) {
+    const validDate = typeof review.reviewDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(review.reviewDate);
+    const validTitle = typeof review.title === "string" && Boolean(review.title.trim());
+    const validMarkdown = typeof review.contentMarkdown === "string" && Boolean(review.contentMarkdown.trim()) && review.contentMarkdown.length <= 100_000;
+    const validCards = Array.isArray(cards) && cards.length <= 50 && cards.every((card) => card && typeof card.id === "string" && typeof card.prompt === "string" && typeof card.normal === "string" && (!card.slow || typeof card.slow === "string"));
+    if (!validDate || !validTitle || !validMarkdown || !validCards) {
       return Response.json({ message: "每日复习包格式无效。" }, { status: 400 });
     }
     const { error: reviewError } = await admin.from("reviews").upsert({
