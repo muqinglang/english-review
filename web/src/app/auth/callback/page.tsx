@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 export default function AuthCallbackPage() {
@@ -22,5 +23,5 @@ export default function AuthCallbackPage() {
     }
     finish();
   }, []);
-  return <main className="flex min-h-screen items-center justify-center bg-[#f7f7f2] px-5 text-[#172223]"><p className="rounded-xl bg-white p-6 font-bold shadow-lg">{message}</p></main>;
+  return <main className="flex min-h-screen items-center justify-center bg-[#f7f7f2] px-5 text-[#172223]"><section className="rounded-xl bg-white p-6 text-center shadow-lg"><p className="font-bold">{message}</p>{message !== "正在完成登录…" && <Link href="/login" className="mt-5 inline-block rounded-lg bg-[#172223] px-4 py-2 text-sm font-bold text-white">返回登录页</Link>}</section></main>;
 }
