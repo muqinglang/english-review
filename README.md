@@ -25,3 +25,11 @@
 ```powershell
 .\worker\push-items.ps1 -ItemsFile .\worker\example-items.json
 ```
+
+推送每天完整的文字复习与听力卡片：
+
+```powershell
+.\worker\push-daily-review.ps1 `
+  -MarkdownFile .\reviews\2026-08-07.md `
+  -AudioFile .\reviews\2026-08-07.audio.json
+```
