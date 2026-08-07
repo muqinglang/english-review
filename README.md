@@ -10,3 +10,18 @@
 - [第一期技术方案](TECHNICAL_PLAN_V1.md)
 
 本仓库不会提交个人学习总账、每日复习文件、浏览器 Cookie 或任何密钥。
+
+## 配置本机 Worker 令牌
+
+运行以下脚本并在隐藏输入中粘贴一次性 Worker 令牌。令牌使用 Windows
+当前账户加密保存，不会进入命令历史，加密文件也已被 Git 忽略。
+
+```powershell
+.\worker\configure-token.ps1
+```
+
+之后推送数据时无需再把令牌写到命令行：
+
+```powershell
+.\worker\push-items.ps1 -ItemsFile .\worker\example-items.json
+```
