@@ -17,8 +17,9 @@ export default function Home() {
       <section className="mx-auto grid max-w-6xl gap-12 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-24">
         <div>
           <p className="mb-4 text-sm font-bold tracking-[0.18em] text-[#4e8a70]">YOUR CHAT-BASED KNOWLEDGE BASE</p>
-          <h1 className="max-w-[680px] text-[clamp(2.8rem,5vw,5.25rem)] font-black leading-[1.13] tracking-[-0.045em] text-[#172223]"><span className="block">把每次聊天，</span><span className="mt-2 block text-[#315547]">变成可回顾的知识。</span></h1>
-          <p className="mt-8 max-w-xl text-[1.05rem] leading-8 text-[#53645d]">你照常使用 ChatGPT。本机 Worker 把值得保留的英语、投资或其他主题内容，安全推送到你的线上知识库。</p>
+          <h1 className="max-w-[720px] text-[clamp(2.7rem,5vw,5.1rem)] font-black leading-[1.06] tracking-[-0.055em] text-[#172223]">Turn conversations<br /><span className="text-[#315547]">into knowledge.</span></h1>
+          <p className="mt-5 text-base font-semibold text-[#4e8a70]">把每次聊天，变成随时可回顾的知识。</p>
+          <p className="mt-5 max-w-xl text-[1.05rem] leading-8 text-[#53645d]">你照常使用 ChatGPT。本机 Worker 把值得保留的英语、投资或其他主题内容，安全推送到你的线上知识库。</p>
           <div className="mt-9 flex flex-wrap gap-3">
             <Link href="/login" className="rounded-full bg-[#172223] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#315547]">登录后开始复习</Link>
             <span className="rounded-full border border-[#d5ddd7] bg-white px-5 py-3 text-sm font-semibold text-[#52635c]">数据连接已就绪</span>
