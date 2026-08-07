@@ -1,0 +1,13 @@
+{
+  "space": "English",
+  "items": [
+    {
+      "normalizedKey": "wrestle-with",
+      "type": "expression",
+      "cue": "What does ‘wrestle with’ mean?",
+      "answer": "To struggle with a difficult problem or feeling.",
+      "example": "She is wrestling with a difficult decision.",
+      "priority": "medium"
+    }
+  ]
+}
