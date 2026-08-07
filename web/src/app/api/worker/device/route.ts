@@ -21,3 +21,14 @@ export async function POST(request: Request) {
   }
   return Response.json({ token, warning: "此令牌仅显示一次；请保存在本机 Worker 配置中。" }, { status: 201 });
 }
+
+export async function DELETE(request: Request) {
+  const user = await currentUser();
+  if (!user) return Response.json({ message: "请先登录。" }, { status: 401 });
+  const { deviceId } = await request.json().catch(() => ({}));
+  if (typeof deviceId !== "string" || !deviceId) return Response.json({ message: "设备 ID 无效。" }, { status: 400 });
+  const { data, error } = await createAdminClient().from("worker_devices").update({ revoked_at: new Date().toISOString() }).eq("id", deviceId).eq("user_id", user.id).is("revoked_at", null).select("id").maybeSingle();
+  if (error) return Response.json({ message: "无法撤销 Worker 令牌。" }, { status: 500 });
+  if (!data) return Response.json({ message: "设备不存在或已经撤销。" }, { status: 404 });
+  return Response.json({ ok: true });
+}

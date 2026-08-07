@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { WorkerTokenPanel } from "@/components/worker-token-panel";
 import { ReviewLibrary, type ReviewLibraryData } from "@/components/review-library";
 
 type JsonObject = Record<string, unknown>;
@@ -36,10 +35,9 @@ export default async function ReviewPage() {
   }));
   return <main className="min-h-screen bg-[#f7f7f2] px-5 py-8 text-[#172223] sm:px-10">
     <div className="mx-auto max-w-6xl">
-      <nav className="flex items-center justify-between"><Link href="/" className="font-black">Chat Review</Link><span className="text-sm font-bold text-[#4e8a70]">已登录</span></nav>
+      <nav className="flex items-center justify-between"><Link href="/" className="font-black">Chat Review</Link><div className="flex items-center gap-2"><span className="hidden text-sm font-bold text-[#4e8a70] sm:inline">已登录</span><Link href="/settings" className="rounded-lg border border-[#dce4dc] bg-white px-3 py-2 text-sm font-bold text-[#41514b] hover:border-[#9eb9a8]">设置</Link></div></nav>
       <header className="mt-12"><p className="text-sm font-extrabold tracking-[0.16em] text-[#4e8a70]">YOUR REVIEW LIBRARY</p><h1 className="mt-3 text-4xl font-black sm:text-5xl">每天复习一点，记得更久。</h1><p className="mt-4 max-w-2xl leading-7 text-[#596861]">按主题保存每天的完整复习：先主动回忆文字题，再用英语语音做听力和跟读。</p></header>
       {libraries.length ? <ReviewLibrary libraries={libraries} /> : <section className="mt-8 rounded-2xl border border-[#dce4dc] bg-white p-10 text-center"><h2 className="text-xl font-black">还没有复习分类</h2><p className="mt-3 text-[#718078]">连接本机 Worker 并推送第一份每日复习后，内容会显示在这里。</p></section>}
-      <details className="mt-8 rounded-2xl border border-[#dce4dc] bg-white p-5"><summary className="cursor-pointer font-extrabold">Worker 与数据连接设置</summary><WorkerTokenPanel /></details>
     </div>
   </main>;
 }
