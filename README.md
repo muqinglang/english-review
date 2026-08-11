@@ -26,6 +26,23 @@
 .\worker\push-items.ps1 -ItemsFile .\worker\example-items.json
 ```
 
+## 把新学习内容加入次日复习
+
+将整理好的学习项保存为 `inbox/*.json`，格式见
+[`inbox/README.md`](inbox/README.md)，然后运行：
+
+```powershell
+.\worker\import-inbox.ps1 -Verbose
+.\worker\pull-review-state.ps1 -Verbose
+```
+
+入库成功的新项目会在 `capturedOn` 的次日首次到期。成功处理的文件会移动到
+`inbox/processed/`，失败文件会原样保留，避免静默丢失学习内容。网站也提供“新增学习内容”入口，适合不方便创建 JSON 时使用。
+
+每个学习项只保存一个可独立评分的知识点。不要写成 `one size doesn't fit all; nudge; willpower`，也不要用斜杠合并多个词；应拆成 3 个项目，让每个项目拥有自己的稳定标识和复习排期。每日答案会为每题提供中文核心含义、通俗解释、至少 3 个不同生活场景的英中例句，以及易混或使用提示。
+
+结构化丰富答案建议让 `answer` 只保存简洁核心答案，把 `meaning`、`explanation`、`usageTip` 和至少 3 个 `{scenario, english, chinese}` 场景序列化为单行 `example` JSON 字符串；旧的纯文本 `example` 仍然兼容。完整示例见 [`inbox/README.md`](inbox/README.md)。
+
 推送每天完整的文字复习与听力卡片：
 
 ```powershell

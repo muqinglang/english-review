@@ -2,6 +2,8 @@
 ledger.json
 reviews/
 *.audio.json
+inbox/*
+!inbox/README.md
 
 # Local runtime files and secrets
 .env
