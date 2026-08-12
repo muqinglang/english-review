@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { clearAllSessionCookies } from "@/lib/auth-session";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   const response = NextResponse.json({ ok: true });
-  response.cookies.set("english-review-access", "", { httpOnly: true, sameSite: "lax", secure: true, path: "/", maxAge: 0 });
-  response.cookies.set("english-review-refresh", "", { httpOnly: true, sameSite: "lax", secure: true, path: "/", maxAge: 0 });
+  clearAllSessionCookies(request, response);
   return response;
 }
