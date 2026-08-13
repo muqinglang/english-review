@@ -156,6 +156,19 @@ function formatDueDate(value: string) {
   return match ? `${match[1]}年${Number(match[2])}月${Number(match[3])}日` : value;
 }
 
+function EyeIcon({ open }: { open: boolean }) {
+  return open ? (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="2.75" />
+    </svg>
+  ) : (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="m3 3 18 18M10.6 6.1A9.5 9.5 0 0 1 12 6c6 0 9.5 6 9.5 6a15 15 0 0 1-2.2 2.8M6.2 7.2C3.8 9 2.5 12 2.5 12s3.5 6 9.5 6c1.2 0 2.3-.2 3.3-.6M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </svg>
+  );
+}
+
 function cleanText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
@@ -336,6 +349,8 @@ export function ReviewLibrary({
   const [mode, setMode] = useState<"text" | "audio">("text");
   const [playing, setPlaying] = useState("");
   const [audioNotice, setAudioNotice] = useState("");
+  const [visibleAudioTranscripts, setVisibleAudioTranscripts] = useState<Record<string, boolean>>({});
+  const [audioDrafts, setAudioDrafts] = useState<Record<string, string>>({});
   const [cardStates, setCardStates] = useState<Record<string, CardState>>({});
   const objectUrlsRef = useRef(new Map<string, string>());
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -383,7 +398,13 @@ export function ReviewLibrary({
 
   function resetReviewState() {
     cancelPlayback();
+    setAudioNotice("");
     setMode("text");
+  }
+
+  function chooseMode(nextMode: "text" | "audio") {
+    if (nextMode !== "audio") cancelPlayback();
+    setMode(nextMode);
   }
 
   function chooseLibrary(id: string) {
@@ -564,25 +585,73 @@ export function ReviewLibrary({
         </div>
 
         <div className="mt-6 flex gap-2 rounded-xl bg-[#f3f6f2] p-1.5" role="group" aria-label="复习模式">
-          <button type="button" aria-pressed={mode === "text"} onClick={() => setMode("text")} className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-extrabold ${mode === "text" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078]"}`}>文字复习</button>
-          <button type="button" aria-pressed={mode === "audio"} onClick={() => setMode("audio")} className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-extrabold ${mode === "audio" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078]"}`}>听力与跟读 · {review.audioCards.length}</button>
+          <button type="button" aria-pressed={mode === "text"} onClick={() => chooseMode("text")} className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-extrabold ${mode === "text" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078]"}`}>文字复习</button>
+          <button type="button" aria-pressed={mode === "audio"} onClick={() => chooseMode("audio")} className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-extrabold ${mode === "audio" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078]"}`}>听力与跟读 · {review.audioCards.length}</button>
         </div>
 
         <div className="mt-8">{mode === "text" ? (
           review.cards.length ? <ReviewCards cards={review.cards} states={cardStates} onReveal={revealCard} onSubmit={submitAttempt} sessionAnsweredItemIds={sessionAnsweredItemIds} /> : <MarkdownReview markdown={review.markdown} />
         ) : (
           <div className="space-y-4">
-            <div className="rounded-xl bg-[#edf5ef] p-4 text-sm leading-6 text-[#416454]">先听正常语速，再听慢速，最后遮住文字跟读。音频优先使用 ElevenLabs，服务暂不可用时会自动切换到浏览器英语语音。</div>
+            <div className="rounded-xl bg-[#edf5ef] p-4 text-sm leading-6 text-[#416454]">
+              <p className="font-extrabold">先听 → 输入 → 点眼睛核对</p>
+              <p className="mt-1">先不要看英文，写下你听到的内容，再显示原文对照。草稿只保留在当前页面，不会提交评分。</p>
+            </div>
             {audioNotice && <div role="status" className="rounded-xl bg-[#fffaf0] p-4 text-sm leading-6 text-[#80631c]">{audioNotice}</div>}
             <span className="sr-only" aria-live="polite">{playing ? "正在播放音频" : "音频播放结束"}</span>
-            {review.audioCards.map((card, index) => <article key={card.id} className="rounded-xl border border-[#dce4dc] p-5">
-              <p className="text-xs font-extrabold text-[#2f755f]">{String(index + 1).padStart(2, "0")} · {card.prompt}</p>
-              <p className="mt-3 text-base font-bold leading-7 text-[#172223]">{card.normal}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button type="button" onClick={() => playAudio(card.id, review.id, card.id, "normal", card.normal, 1)} className="rounded-lg bg-[#172223] px-4 py-2 text-sm font-bold text-white">{playing === card.id ? "正在播放…" : "▶ 正常语速"}</button>
-                <button type="button" onClick={() => playAudio(`${card.id}-slow`, review.id, card.id, "slow", card.slow || card.normal, 0.75)} className="rounded-lg border border-[#b9c9bf] px-4 py-2 text-sm font-bold text-[#315f4f]">{playing === `${card.id}-slow` ? "正在播放…" : "慢速跟读"}</button>
-              </div>
-            </article>)}
+            {review.audioCards.map((card, index) => {
+              const stateKey = JSON.stringify([review.id, card.id]);
+              const normalPlaybackId = `${stateKey}:normal`;
+              const slowPlaybackId = `${stateKey}:slow`;
+              const transcriptId = `audio-transcript-${review.id}-${index}`;
+              const inputId = `audio-draft-${review.id}-${index}`;
+              const transcriptVisible = visibleAudioTranscripts[stateKey] ?? false;
+              const draft = audioDrafts[stateKey] ?? "";
+
+              return <article key={stateKey} className="rounded-xl border border-[#dce4dc] p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <p className="text-xs font-extrabold text-[#2f755f]">{String(index + 1).padStart(2, "0")} · {card.prompt}</p>
+                  <button
+                    type="button"
+                    aria-label={transcriptVisible ? "隐藏英文原文" : "显示英文原文"}
+                    aria-expanded={transcriptVisible}
+                    aria-controls={transcriptId}
+                    title={transcriptVisible ? "隐藏英文原文" : "显示英文原文并核对"}
+                    onClick={() => setVisibleAudioTranscripts((current) => ({ ...current, [stateKey]: !transcriptVisible }))}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#c8d5cd] bg-white px-3 py-2 text-xs font-extrabold text-[#315f4f] transition hover:bg-[#edf5ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f755f]"
+                  >
+                    <EyeIcon open={transcriptVisible} />
+                    {transcriptVisible ? "隐藏原文" : "显示原文"}
+                  </button>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => playAudio(normalPlaybackId, review.id, card.id, "normal", card.normal, 1)} className="rounded-lg bg-[#172223] px-4 py-2 text-sm font-bold text-white">{playing === normalPlaybackId ? "正在播放…" : "▶ 正常语速"}</button>
+                  <button type="button" onClick={() => playAudio(slowPlaybackId, review.id, card.id, "slow", card.slow || card.normal, 0.75)} className="rounded-lg border border-[#b9c9bf] px-4 py-2 text-sm font-bold text-[#315f4f]">{playing === slowPlaybackId ? "正在播放…" : "慢速跟读"}</button>
+                </div>
+
+                <label htmlFor={inputId} className="mt-5 block text-sm font-extrabold text-[#41514b]">写下你听到的英文</label>
+                <textarea
+                  id={inputId}
+                  value={draft}
+                  onChange={(event) => setAudioDrafts((current) => ({ ...current, [stateKey]: event.target.value }))}
+                  rows={3}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck="false"
+                  placeholder="先凭听力写下来，再点右上角眼睛核对…"
+                  className="mt-2 w-full resize-y rounded-xl border border-[#cfd9d2] bg-[#fbfcfa] px-3.5 py-3 text-sm leading-6 text-[#172223] outline-none transition placeholder:text-[#617068] focus:border-[#4e8a70] focus:ring-2 focus:ring-[#4e8a70]/15"
+                />
+
+                <div id={transcriptId} className={`mt-4 rounded-xl border px-4 py-3 ${transcriptVisible ? "border-[#b8d2c2] bg-[#f1f8f3]" : "border-dashed border-[#dce4dc] bg-[#fafbf9]"}`}>
+                  {transcriptVisible ? <>
+                    <p className="text-xs font-extrabold tracking-[0.1em] text-[#2f755f]">英文原文</p>
+                    <p className="mt-2 text-base font-bold leading-7 text-[#172223]">{card.normal}</p>
+                  </> : <p className="text-sm leading-6 text-[#596861]">英文原文已隐藏。输入完成后，点右上角眼睛核对。</p>}
+                </div>
+              </article>;
+            })}
           </div>
         )}</div>
       </> : <div className="py-16 text-center"><p className="text-lg font-black">这个分类还没有每日复习</p><p className="mt-2 text-sm text-[#718078]">Worker 推送下一份复习包后会显示在这里。</p></div>}
