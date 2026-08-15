@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatCircleDots, Eye, EyeSlash, Headphones, Play, SpeakerHigh, Stack } from "@phosphor-icons/react";
+import { ConversationImport } from "@/components/conversation-import";
 
 type AttemptResult = "incorrect" | "partial" | "correct";
 
@@ -660,7 +661,7 @@ export function ReviewLibrary({
         <button type="button" role="tab" aria-selected={activeTab === "audio"} onClick={() => setActiveTab("audio")} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-extrabold transition ${activeTab === "audio" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078] hover:text-[#41514b]"}`}><Headphones size={17} />听力跟读</button>
       </div>
 
-      {activeTab === "conversation" ? <LatestConversationReview items={library.latestConversationItems} reviewDate={library.latestConversationDate} /> : review ? <>
+      {activeTab === "conversation" ? <><ConversationImport /><LatestConversationReview items={library.latestConversationItems} reviewDate={library.latestConversationDate} /></> : review ? <>
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#e3e9e3] pb-6">
           <div>
             <p className="text-xs font-extrabold tracking-[0.14em] text-[#2f755f]">{review.date} · {review.level} · {review.duration} 分钟</p>

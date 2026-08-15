@@ -2,23 +2,8 @@ import { createHash } from "node:crypto";
 import { bearerToken, isIsoDate, shanghaiDate } from "@/lib/srs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify, workerTokenHash } from "@/lib/worker";
+import { hasMergedKnowledgePoint, isRecord, nonEmptyString, validateItems } from "@/lib/practice-payload";
 
-const ITEM_TYPES = ["fact", "concept", "decision", "quote", "vocabulary", "expression", "grammar", "error", "pronunciation"] as const;
-const PRIORITIES = ["high", "medium", "low"] as const;
-
-type ItemType = (typeof ITEM_TYPES)[number];
-type Priority = (typeof PRIORITIES)[number];
-type ValidatedItem = {
-  normalizedKey: string;
-  type: ItemType;
-  cue: string;
-  answer: string;
-  example: string | null;
-  priority: Priority;
-  occurrences: number;
-  dueDate: string | null;
-  learnedOn: string | null;
-};
 type AudioCard = { id: string; prompt: string; normal: string; slow?: string };
 type ValidatedReview = {
   reviewDate: string;
@@ -29,78 +14,6 @@ type ValidatedReview = {
   level: string;
   itemKeys: string[];
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function nonEmptyString(value: unknown, maxLength: number) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed && trimmed.length <= maxLength ? trimmed : null;
-}
-
-function normalizeExample(value: unknown): string | null {
-  if (value === undefined || value === null) return null;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed && trimmed.length <= 20_000 ? trimmed : null;
-  }
-  if (!isRecord(value)) return null;
-
-  const meaning = nonEmptyString(value.meaning, 2_000);
-  const explanation = nonEmptyString(value.explanation, 6_000);
-  const usageTip = nonEmptyString(value.usageTip, 4_000);
-  if (!meaning || !explanation || !usageTip || !Array.isArray(value.examples) || value.examples.length < 3 || value.examples.length > 8) return null;
-
-  const examples = value.examples.map((raw) => {
-    if (!isRecord(raw)) return null;
-    const scenario = nonEmptyString(raw.scenario, 500);
-    const english = nonEmptyString(raw.english, 3_000);
-    const chinese = nonEmptyString(raw.chinese, 3_000);
-    return scenario && english && chinese ? { scenario, english, chinese } : null;
-  });
-  if (examples.some((example) => !example)) return null;
-
-  const serialized = JSON.stringify({ meaning, explanation, usageTip, examples });
-  return serialized.length <= 20_000 ? serialized : null;
-}
-
-function validateItems(value: unknown): ValidatedItem[] | null {
-  if (value === undefined) return [];
-  if (!Array.isArray(value) || value.length > 100) return null;
-
-  const items: ValidatedItem[] = [];
-  const keys = new Set<string>();
-  for (const raw of value) {
-    if (!isRecord(raw)) return null;
-    const normalizedKey = nonEmptyString(raw.normalizedKey, 240);
-    const cue = nonEmptyString(raw.cue, 20_000);
-    const answer = nonEmptyString(raw.answer, 50_000);
-    if (!normalizedKey || !cue || !answer || keys.has(normalizedKey)) return null;
-    if (typeof raw.type !== "string" || !ITEM_TYPES.includes(raw.type as ItemType)) return null;
-    if (raw.priority !== undefined && (typeof raw.priority !== "string" || !PRIORITIES.includes(raw.priority as Priority))) return null;
-    const example = normalizeExample(raw.example);
-    if (raw.example !== undefined && raw.example !== null && !example) return null;
-    if (raw.occurrences !== undefined && (!Number.isInteger(raw.occurrences) || Number(raw.occurrences) <= 0 || Number(raw.occurrences) > 1_000_000)) return null;
-    if (raw.dueDate !== undefined && raw.dueDate !== null && !isIsoDate(raw.dueDate)) return null;
-    if (raw.learnedOn !== undefined && raw.learnedOn !== null && !isIsoDate(raw.learnedOn)) return null;
-
-    keys.add(normalizedKey);
-    items.push({
-      normalizedKey,
-      type: raw.type as ItemType,
-      cue,
-      answer,
-      example,
-      priority: (raw.priority as Priority | undefined) ?? "medium",
-      occurrences: raw.occurrences === undefined ? 1 : Number(raw.occurrences),
-      dueDate: typeof raw.dueDate === "string" ? raw.dueDate : null,
-      learnedOn: typeof raw.learnedOn === "string" ? raw.learnedOn : null,
-    });
-  }
-  return items;
-}
 
 function validateReview(value: unknown): ValidatedReview | null {
   if (!isRecord(value) || !isIsoDate(value.reviewDate)) return null;
@@ -178,7 +91,7 @@ export async function POST(request: Request) {
   // Guard against merging several knowledge points into one item, but only on the
   // normalizedKey (the identity). The cue/answer are natural-language prose where
   // a slash is legitimate (e.g. the Chinese gloss "积分/额度" for one phrase).
-  if (isGptPracticeSync && items.some((item) => /[;；/、]/.test(item.normalizedKey))) {
+  if (isGptPracticeSync && hasMergedKnowledgePoint(items)) {
     return Response.json({ message: "每个学习项只能包含一个独立知识点；请拆分并列词汇、短语或语法点后重试。" }, { status: 400 });
   }
   const scheduledItems = items;
