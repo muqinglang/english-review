@@ -238,6 +238,11 @@ function LatestConversationReview({ items, reviewDate }: { items: YesterdayConve
   const [results, setResults] = useState<Record<string, AttemptResult>>({});
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // Parse each item's rich answer once, not on every reveal/self-grade re-render.
+  const richAnswers = useMemo(
+    () => new Map(items.map((item) => [item.id, parseRichAnswer(item)])),
+    [items],
+  );
   if (!items.length) {
     return <section className="mt-5 rounded-2xl border border-dashed border-[#c8dccc] bg-[#f8fbf8] p-5 sm:p-6" aria-labelledby="latest-conversation-title">
       <p id="latest-conversation-title" className="text-lg font-black text-[#286247]">最新对话复习</p>
@@ -275,7 +280,7 @@ function LatestConversationReview({ items, reviewDate }: { items: YesterdayConve
     </div>
     <div className="mt-5 grid gap-3">
       {items.map((item, index) => {
-        const richAnswer = parseRichAnswer(item);
+        const richAnswer = richAnswers.get(item.id) ?? parseRichAnswer(item);
         const isRevealed = revealed[item.id] ?? false;
         return <article key={item.id} className="rounded-xl border border-[#dce4dc] bg-white p-4">
           <p className="text-xs font-extrabold tracking-[0.1em] text-[#2f755f]">第 {index + 1} 项</p>
@@ -329,6 +334,11 @@ function ReviewCards({
   onSubmit: (card: ReviewCardData, result: AttemptResult) => void;
   sessionAnsweredItemIds: ReadonlySet<string>;
 }) {
+  // Parse each card's rich answer once; reveal/self-grade re-renders reuse it.
+  const richAnswers = useMemo(
+    () => new Map(cards.map((card) => [card.reviewItemId, parseRichAnswer(card)])),
+    [cards],
+  );
   return <div className="space-y-4">
     <div className="rounded-xl bg-[#edf5ef] p-4 text-sm leading-6 text-[#416454]">
       今天共 {cards.length} 题。先在心里说出答案，再点“查看答案”并如实自评；系统会据此安排下一次复习。
@@ -342,7 +352,7 @@ function ReviewCards({
       const stage = state.stage ?? card.stage;
       const status = state.status ?? card.status;
       const titleId = `review-card-${card.reviewItemId}`;
-      const richAnswer = parseRichAnswer(card);
+      const richAnswer = richAnswers.get(card.reviewItemId) ?? parseRichAnswer(card);
 
       return <article key={card.reviewItemId} aria-labelledby={titleId} aria-busy={state.submitting || undefined} className="rounded-2xl border border-[#dce4dc] bg-[#fcfdfb] p-5 sm:p-6">
         <p className="text-xs font-extrabold tracking-[0.12em] text-[#2f755f]">第 {index + 1} 题 / 共 {cards.length} 题</p>
