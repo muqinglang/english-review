@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "English Tranning Review Sync",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Automatically saves explicit English review items from completed ChatGPT practice sessions.",
   "permissions": ["storage"],
   "host_permissions": ["https://chatgpt.com/*", "https://english-review-three.vercel.app/*"],

@@ -16,7 +16,9 @@ function validItem(item) {
   const key = clean(item.normalizedKey, 240);
   const cue = clean(item.cue, 20000);
   const answer = clean(item.answer, 50000);
-  if (!key || !cue || !answer || /[;；/、]/.test(`${key}${cue}${answer}`)) return false;
+  // Only the identity key must stay a single knowledge point; cue/answer prose may
+  // legitimately contain a slash (e.g. a Chinese gloss like "积分/额度").
+  if (!key || !cue || !answer || /[;；/、]/.test(key)) return false;
   return ["vocabulary", "expression", "grammar", "error", "pronunciation"].includes(item.type);
 }
 

@@ -175,7 +175,10 @@ export async function POST(request: Request) {
   if (!displayName || !items || (body.review !== undefined && !review) || (!items.length && !review) || (isGptPracticeSync && review)) {
     return Response.json({ message: "推送格式无效；space、学习项和复习包字段必须非空且唯一。" }, { status: 400 });
   }
-  if (isGptPracticeSync && items.some((item) => /[;；/、]/.test(`${item.normalizedKey}${item.cue}${item.answer}`))) {
+  // Guard against merging several knowledge points into one item, but only on the
+  // normalizedKey (the identity). The cue/answer are natural-language prose where
+  // a slash is legitimate (e.g. the Chinese gloss "积分/额度" for one phrase).
+  if (isGptPracticeSync && items.some((item) => /[;；/、]/.test(item.normalizedKey))) {
     return Response.json({ message: "每个学习项只能包含一个独立知识点；请拆分并列词汇、短语或语法点后重试。" }, { status: 400 });
   }
   const scheduledItems = items;
