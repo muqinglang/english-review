@@ -56,16 +56,6 @@ type ReviewAttemptRow = {
   answered_at: string;
 };
 
-function hasCompleteConversationExamples(example: string | null) {
-  if (!example?.trim().startsWith("{")) return false;
-  try {
-    const parsed = JSON.parse(example) as { examples?: unknown };
-    return Array.isArray(parsed.examples) && parsed.examples.length >= 3;
-  } catch {
-    return false;
-  }
-}
-
 export default async function ReviewPage() {
   const token = (await cookies()).get("english-review-access")?.value;
   const user = await currentUser();
@@ -128,8 +118,13 @@ export default async function ReviewPage() {
     rich: conversationDiagnostics.filter((item) => item.scenarioCount >= 3).length,
     ungraded: conversationDiagnostics.filter((item) => item.attempts === 0).length,
   });
+  // Show the latest synced batch so it can actually be reviewed. We do NOT
+  // require the rich {meaning, 3 scenarios} shape here: if ChatGPT only produced
+  // plain-text examples, the card still renders (plain fallback) instead of the
+  // whole batch silently disappearing. Only already-self-graded items are hidden
+  // (they have moved on to the SRS "旧题复习" queue).
   const latestConversationRows = rawConversationRows
-    .filter((item) => !item.practice_attempts?.length && hasCompleteConversationExamples(item.example));
+    .filter((item) => !item.practice_attempts?.length);
   const latestSessionBySpace = new Map<string, { id: string; practiceDate: string; createdAt: string }>();
   for (const item of latestConversationRows) {
     const session = sessionFor(item);
