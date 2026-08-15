@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GearSix, Plus, SquaresFour } from "@phosphor-icons/react/dist/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
@@ -38,19 +39,42 @@ type LearningItemRow = {
   status: string;
 };
 
+type YesterdayConversationRow = {
+  id: string;
+  created_at: string;
+  normalized_key: string;
+  cue: string;
+  answer: string;
+  example: string | null;
+  practice_sessions: { id: string; knowledge_space_id: string; practice_date: string } | { id: string; knowledge_space_id: string; practice_date: string }[] | null;
+  practice_attempts: { id: string }[];
+};
+
 type ReviewAttemptRow = {
   review_item_id: string;
   result: AttemptResult | null;
   answered_at: string;
 };
 
+function hasCompleteConversationExamples(example: string | null) {
+  if (!example?.trim().startsWith("{")) return false;
+  try {
+    const parsed = JSON.parse(example) as { examples?: unknown };
+    return Array.isArray(parsed.examples) && parsed.examples.length >= 3;
+  } catch {
+    return false;
+  }
+}
+
 export default async function ReviewPage() {
   const token = (await cookies()).get("english-review-access")?.value;
   const user = await currentUser();
   if (!token || !user) redirect("/login");
 
+  const accountLabel = user.email?.split("@", 1)[0]?.trim() || "用户";
+
   const admin = createAdminClient();
-  const [{ data: spaces, error: spacesError }, { data: reviews, error: reviewsError }] = await Promise.all([
+  const [{ data: spaces, error: spacesError }, { data: reviews, error: reviewsError }, { data: conversationItems, error: conversationItemsError }] = await Promise.all([
     admin
       .from("knowledge_spaces")
       .select("id,display_name")
@@ -63,10 +87,72 @@ export default async function ReviewPage() {
       .eq("status", "ready")
       .order("review_date", { ascending: false })
       .limit(60),
+    admin
+      .from("practice_items")
+      .select("id,created_at,normalized_key,cue,answer,example,practice_sessions!inner(id,knowledge_space_id,practice_date),practice_attempts(id)")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
   ]);
-  let structuredLoadError = Boolean(spacesError || reviewsError);
+  let structuredLoadError = Boolean(spacesError || reviewsError || conversationItemsError);
   if (spacesError) console.error("Review knowledge-space query failed", spacesError);
   if (reviewsError) console.error("Review library query failed", reviewsError);
+  if (conversationItemsError) console.error("Latest conversation-item query failed", conversationItemsError);
+  const sessionFor = (item: YesterdayConversationRow) => Array.isArray(item.practice_sessions)
+    ? item.practice_sessions[0] ?? null
+    : item.practice_sessions;
+  const rawConversationRows = (conversationItems ?? []) as YesterdayConversationRow[];
+  const conversationDiagnostics = rawConversationRows.map((item) => {
+    let scenarioCount = 0;
+    try {
+      const parsed = JSON.parse(item.example ?? "") as { examples?: unknown };
+      scenarioCount = Array.isArray(parsed.examples) ? parsed.examples.length : 0;
+    } catch {
+      // Legacy plain-text examples intentionally report zero scenarios.
+    }
+    const session = sessionFor(item);
+    return {
+      itemId: item.id,
+      sessionId: session?.id ?? null,
+      practiceDate: session?.practice_date ?? null,
+      key: item.normalized_key,
+      createdAt: item.created_at,
+      attempts: item.practice_attempts?.length ?? 0,
+      exampleFormat: item.example?.trim().startsWith("{") ? "json" : "plain",
+      scenarioCount,
+    };
+  });
+  // Aggregate counts only — never log per-item keys/content to server logs.
+  console.info("Conversation review diagnostics", {
+    total: rawConversationRows.length,
+    rich: conversationDiagnostics.filter((item) => item.scenarioCount >= 3).length,
+    ungraded: conversationDiagnostics.filter((item) => item.attempts === 0).length,
+  });
+  const latestConversationRows = rawConversationRows
+    .filter((item) => !item.practice_attempts?.length && hasCompleteConversationExamples(item.example));
+  const latestSessionBySpace = new Map<string, { id: string; practiceDate: string; createdAt: string }>();
+  for (const item of latestConversationRows) {
+    const session = sessionFor(item);
+    if (!session) continue;
+    const current = latestSessionBySpace.get(session.knowledge_space_id);
+    if (!current || item.created_at > current.createdAt) {
+      latestSessionBySpace.set(session.knowledge_space_id, {
+        id: session.id,
+        practiceDate: session.practice_date,
+        createdAt: item.created_at,
+      });
+    }
+  }
+  const latestConversationItemsBySpace = new Map<string, YesterdayConversationRow[]>();
+  for (const item of latestConversationRows) {
+    const session = sessionFor(item);
+    const spaceId = session?.knowledge_space_id;
+    const latestSession = spaceId ? latestSessionBySpace.get(spaceId) : null;
+    if (!spaceId || !latestSession || session.id !== latestSession.id) continue;
+    const items = latestConversationItemsBySpace.get(spaceId) ?? [];
+    items.push(item);
+    latestConversationItemsBySpace.set(spaceId, items);
+  }
 
   const reviewIds = (reviews ?? []).map((review) => review.id);
   let reviewItemRows: ReviewItemRow[] = [];
@@ -141,6 +227,14 @@ export default async function ReviewPage() {
   const libraries: ReviewLibraryData[] = (spaces ?? []).map((space) => ({
     id: space.id,
     name: space.display_name,
+    latestConversationDate: latestSessionBySpace.get(space.id)?.practiceDate ?? null,
+    latestConversationItems: (latestConversationItemsBySpace.get(space.id) ?? []).map((item) => ({
+      id: item.id,
+      normalizedKey: item.normalized_key,
+      cue: item.cue,
+      answer: item.answer,
+      example: item.example,
+    })),
     reviews: (reviews ?? [])
       .filter((review) => review.knowledge_space_id === space.id)
       .map((review) => {
@@ -189,20 +283,22 @@ export default async function ReviewPage() {
   }));
 
   return (
-    <main className="min-h-screen bg-[#f7f7f2] px-5 py-8 text-[#172223] sm:px-10">
-      <div className="mx-auto max-w-6xl">
-        <nav className="flex items-center justify-between">
-          <Link href="/" className="font-black">Chat Review</Link>
+    <main className="min-h-[100dvh] bg-[#f4f6f3] px-4 py-4 text-[#172223] sm:px-8 sm:py-6">
+      <div className="mx-auto max-w-7xl">
+        <nav className="flex items-center justify-between border-b border-[#d9dfd8] pb-4">
+          <Link href="/" className="flex items-center gap-2 text-sm font-black tracking-tight"><span className="grid size-8 place-items-center rounded-xl bg-[#172223] text-white"><SquaresFour size={17} weight="fill" /></span>Chat Review</Link>
           <div className="flex items-center gap-2">
-            <span className="hidden text-sm font-bold text-[#4e8a70] sm:inline">已登录</span>
-            <Link href="/capture" className="rounded-lg bg-[#172223] px-3 py-2 text-sm font-bold text-white hover:bg-[#2a3838]">添加内容</Link>
-            <Link href="/settings" className="rounded-lg border border-[#dce4dc] bg-white px-3 py-2 text-sm font-bold text-[#41514b] hover:border-[#9eb9a8]">设置</Link>
+            <span className="hidden max-w-28 truncate text-xs font-bold text-[#4e8a70] sm:inline" title={user.email ?? undefined}>{accountLabel}</span>
+            <Link href="/capture" aria-label="添加内容" title="添加内容" className="grid size-9 place-items-center rounded-xl bg-[#172223] text-white transition hover:bg-[#2e403c] active:translate-y-px"><Plus size={18} weight="bold" /></Link>
+            <Link href="/settings" aria-label="设置" title="设置" className="grid size-9 place-items-center rounded-xl border border-[#cdd6cf] bg-white text-[#41514b] transition hover:border-[#8eaa9a] active:translate-y-px"><GearSix size={18} /></Link>
           </div>
         </nav>
-        <header className="mt-12">
-          <p className="text-sm font-extrabold tracking-[0.16em] text-[#4e8a70]">YOUR REVIEW LIBRARY</p>
-          <h1 className="mt-3 text-4xl font-black sm:text-5xl">每天复习一点，记得更久。</h1>
-          <p className="mt-4 max-w-2xl leading-7 text-[#596861]">先主动回忆题目，再查看答案并自评。系统会按你的掌握情况安排下一次复习。</p>
+        <header className="grid gap-3 py-10 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:py-14">
+          <div>
+            <p className="text-xs font-bold tracking-[0.12em] text-[#4e8a70]">ENGLISH REVIEW</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">把不会的，变成会的。</h1>
+          </div>
+          <p className="max-w-sm text-sm leading-6 text-[#596861]">先回忆，再核对。你的自评会决定下一次出现的时间。</p>
         </header>
         {libraries.length ? (
           <ReviewLibrary libraries={libraries} loadWarning={structuredLoadError} />

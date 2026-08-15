@@ -101,7 +101,7 @@ export function LearningCaptureForm({ spaces }: { spaces: CaptureKnowledgeSpace[
   return (
     <section className="mt-8 rounded-2xl border border-[#dce4dc] bg-white p-6 sm:p-8">
       <div className="rounded-xl bg-[#eff7f1] p-4 text-sm leading-6 text-[#315d4c]">
-        <strong>明天首次复习：</strong>新条目会在“学习日期 + 1 天”进入复习。若检索键已经存在，只更新内容和出现次数，不会重置原有排期。
+        <strong>昨天聊天也可以补录：</strong>将“学习日期”设为昨天，English Tranning 里不会的内容会在今天进入复习。每次只保存一个可独立自评的知识点；若检索键已经存在，只更新内容和出现次数，不会重置原有排期。
       </div>
 
       <form className="mt-7 grid gap-5" onSubmit={submit}>

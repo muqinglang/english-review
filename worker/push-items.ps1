@@ -32,9 +32,10 @@ if ([string]::IsNullOrWhiteSpace($Token)) {
 }
 
 $body = Get-Content -Raw -Encoding UTF8 $ItemsFile
+$bodyBytes = [Text.Encoding]::UTF8.GetBytes($body)
 try {
   Write-Verbose "Sending Worker payload to $ApiBase/api/worker/push"
-  Invoke-RestMethod -Method Post -Uri "$ApiBase/api/worker/push" -Headers @{ Authorization = "Bearer $Token" } -ContentType "application/json; charset=utf-8" -Body $body -TimeoutSec $TimeoutSec -ErrorAction Stop
+  Invoke-RestMethod -Method Post -Uri "$ApiBase/api/worker/push" -Headers @{ Authorization = "Bearer $Token" } -ContentType "application/json; charset=utf-8" -Body $bodyBytes -TimeoutSec $TimeoutSec -ErrorAction Stop
 }
 catch [Net.WebException] {
   $responseBody = ""

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ChatCircleDots, Eye, EyeSlash, Headphones, Play, SpeakerHigh, Stack } from "@phosphor-icons/react";
 
 type AttemptResult = "incorrect" | "partial" | "correct";
 
@@ -26,6 +27,14 @@ export type ReviewCardData = {
   stale: boolean;
   status: string;
   shownAt: string | null;
+};
+
+export type YesterdayConversationItemData = {
+  id: string;
+  normalizedKey: string;
+  cue: string;
+  answer: string;
+  example: string | null;
 };
 
 type LifeScenarioExample = {
@@ -56,6 +65,8 @@ export type ReviewLibraryData = {
   id: string;
   name: string;
   reviews: Review[];
+  latestConversationDate: string | null;
+  latestConversationItems: YesterdayConversationItemData[];
 };
 
 type CardState = {
@@ -156,19 +167,6 @@ function formatDueDate(value: string) {
   return match ? `${match[1]}年${Number(match[2])}月${Number(match[3])}日` : value;
 }
 
-function EyeIcon({ open }: { open: boolean }) {
-  return open ? (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
-      <circle cx="12" cy="12" r="2.75" />
-    </svg>
-  ) : (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
-      <path strokeLinecap="round" strokeLinejoin="round" d="m3 3 18 18M10.6 6.1A9.5 9.5 0 0 1 12 6c6 0 9.5 6 9.5 6a15 15 0 0 1-2.2 2.8M6.2 7.2C3.8 9 2.5 12 2.5 12s3.5 6 9.5 6c1.2 0 2.3-.2 3.3-.6M9.9 9.9a3 3 0 0 0 4.2 4.2" />
-    </svg>
-  );
-}
-
 function cleanText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
@@ -201,7 +199,7 @@ function parsePlainExamples(value: string): LifeScenarioExample[] {
  * text column, so old rows keep working and no destructive schema migration is
  * needed. Plain example text remains a valid fallback.
  */
-function parseRichAnswer(card: ReviewCardData): RichAnswer {
+function parseRichAnswer(card: Pick<ReviewCardData, "answer" | "example">): RichAnswer {
   const fallback: RichAnswer = {
     meaning: card.answer,
     examples: card.example ? parsePlainExamples(card.example) : [],
@@ -232,6 +230,89 @@ function parseRichAnswer(card: ReviewCardData): RichAnswer {
     // A truncated structured payload should never appear as raw JSON in the UI.
     return { meaning: card.answer, examples: [] };
   }
+}
+
+function LatestConversationReview({ items, reviewDate }: { items: YesterdayConversationItemData[]; reviewDate: string | null }) {
+  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+  const [results, setResults] = useState<Record<string, AttemptResult>>({});
+  const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  if (!items.length) {
+    return <section className="mt-5 rounded-2xl border border-dashed border-[#c8dccc] bg-[#f8fbf8] p-5 sm:p-6" aria-labelledby="latest-conversation-title">
+      <p id="latest-conversation-title" className="text-lg font-black text-[#286247]">最新对话复习</p>
+      <p className="mt-2 text-sm leading-6 text-[#416454]">还没有成功同步的 ChatGPT 对话内容。不会用旧的每日复习包替代。</p>
+    </section>;
+  }
+
+  async function submit(item: YesterdayConversationItemData, result: AttemptResult) {
+    if (submitting[item.id] || results[item.id]) return;
+    setSubmitting((current) => ({ ...current, [item.id]: true }));
+    setErrors((current) => ({ ...current, [item.id]: "" }));
+    try {
+      const response = await fetch("/api/practice/attempt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ practiceItemId: item.id, requestId: crypto.randomUUID(), result, submittedText: "" }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok !== true) throw new Error(typeof payload.message === "string" ? payload.message : "无法保存自评。");
+      setResults((current) => ({ ...current, [item.id]: result }));
+    } catch (error) {
+      setErrors((current) => ({ ...current, [item.id]: error instanceof Error ? error.message : "无法保存自评。" }));
+    } finally {
+      setSubmitting((current) => ({ ...current, [item.id]: false }));
+    }
+  }
+
+  return <section className="mt-5 rounded-2xl border border-[#c8dccc] bg-[#f5faf5] p-5 sm:p-6" aria-labelledby="latest-conversation-title">
+    <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <div>
+        <p id="latest-conversation-title" className="text-lg font-black text-[#286247]">最新对话复习</p>
+        <p className="mt-1 text-sm leading-6 text-[#416454]">来自 {reviewDate} 最近一次成功同步的 {items.length} 个学习项。先在心里回答，再自评；结果会按遗忘曲线进入历史推荐。</p>
+      </div>
+      <span className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-[#2f755f]">对话同步</span>
+    </div>
+    <div className="mt-5 grid gap-3">
+      {items.map((item, index) => {
+        const richAnswer = parseRichAnswer(item);
+        const isRevealed = revealed[item.id] ?? false;
+        return <article key={item.id} className="rounded-xl border border-[#dce4dc] bg-white p-4">
+          <p className="text-xs font-extrabold tracking-[0.1em] text-[#2f755f]">第 {index + 1} 项</p>
+          <h3 className="mt-2 font-black leading-7 text-[#172223]">{item.cue}</h3>
+          {!isRevealed ? <button type="button" onClick={() => setRevealed((current) => ({ ...current, [item.id]: true }))} className="mt-3 rounded-lg border border-[#b9c9bf] bg-white px-3 py-2 text-sm font-extrabold text-[#315f4f] hover:bg-[#edf5ef]">查看答案</button> : <div className="mt-4 overflow-hidden rounded-xl border border-[#dce4dc]">
+            <section className="p-4">
+              <p className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">核心含义</p>
+              <p className="mt-2 text-base font-bold leading-7 text-[#172223]">{richAnswer.meaning}</p>
+            </section>
+            {richAnswer.explanation && <section className="border-t border-[#e3e9e3] bg-[#fbfcfa] p-4">
+              <p className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">这样理解</p>
+              <p className="mt-2 text-sm leading-7 text-[#41514b]">{richAnswer.explanation}</p>
+            </section>}
+            {richAnswer.examples.length > 0 && <section className="border-t border-[#e3e9e3] p-4">
+              <p className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">生活场景</p>
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                {richAnswer.examples.map((example, exampleIndex) => <article key={`${example.english}-${exampleIndex}`} className="rounded-xl bg-[#f3f7f2] p-4">
+                  <p className="text-xs font-extrabold text-[#2f755f]">{example.scenario ?? `场景 ${exampleIndex + 1}`}</p>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-[#172223]">{example.english}</p>
+                  {example.chinese && <p className="mt-2 text-sm leading-6 text-[#596861]">{example.chinese}</p>}
+                </article>)}
+              </div>
+            </section>}
+            {richAnswer.usageTip && <section className="border-t border-[#e3e9e3] bg-[#fffaf0] p-4">
+              <p className="text-xs font-extrabold tracking-[0.12em] text-[#80631c]">使用提醒</p>
+              <p className="mt-2 text-sm leading-7 text-[#5f512d]">{richAnswer.usageTip}</p>
+            </section>}
+            <div className="border-t border-[#e3e9e3] bg-[#f1f8f3] p-4">
+              {results[item.id] ? <p className="font-extrabold text-[#286247]">已自评：{resultLabels[results[item.id]]}，已进入历史复习排期。</p> : <div className="flex flex-wrap gap-2">
+                {(["incorrect", "partial", "correct"] as AttemptResult[]).map((result) => <button key={result} type="button" disabled={submitting[item.id]} onClick={() => submit(item, result)} className={`rounded-lg border px-3 py-2 text-xs font-extrabold transition disabled:opacity-50 ${result === "incorrect" ? "border-[#e2b7ad] bg-[#fff8f6] text-[#944c3f] hover:bg-[#fcebe7]" : result === "partial" ? "border-[#dec991] bg-[#fffaf0] text-[#80631c] hover:bg-[#fbf1d6]" : "border-[#a9cbb7] bg-[#f1faf4] text-[#286247] hover:bg-[#e2f3e8]"}`}>{submitting[item.id] ? "保存中…" : resultLabels[result]}</button>)}
+              </div>}
+              {errors[item.id] && <p className="mt-2 font-semibold text-[#9b3c2f]">{errors[item.id]}</p>}
+            </div>
+          </div>}
+        </article>;
+      })}
+    </div>
+  </section>;
 }
 
 function ReviewCards({
@@ -346,7 +427,8 @@ export function ReviewLibrary({
 }) {
   const [libraryId, setLibraryId] = useState(libraries[0]?.id ?? "");
   const [reviewId, setReviewId] = useState(libraries[0]?.reviews[0]?.id ?? "");
-  const [mode, setMode] = useState<"text" | "audio">("text");
+  const [activeTab, setActiveTab] = useState<"conversation" | "history" | "audio">("conversation");
+  const [ttsProvider, setTtsProvider] = useState<"fish_audio" | "elevenlabs">("fish_audio");
   const [playing, setPlaying] = useState("");
   const [audioNotice, setAudioNotice] = useState("");
   const [visibleAudioTranscripts, setVisibleAudioTranscripts] = useState<Record<string, boolean>>({});
@@ -366,7 +448,6 @@ export function ReviewLibrary({
     () => library?.reviews.find((item) => item.id === reviewId) ?? library?.reviews[0],
     [library, reviewId],
   );
-
   useEffect(() => {
     const objectUrls = objectUrlsRef.current;
     mountedRef.current = true;
@@ -382,6 +463,13 @@ export function ReviewLibrary({
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
       objectUrls.clear();
     };
+  }, []);
+  useEffect(() => {
+    const saved = window.localStorage.getItem("english-review-tts-provider");
+    const frame = window.requestAnimationFrame(() => {
+      if (saved === "fish_audio" || saved === "elevenlabs") setTtsProvider(saved);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   function cancelPlayback() {
@@ -399,12 +487,7 @@ export function ReviewLibrary({
   function resetReviewState() {
     cancelPlayback();
     setAudioNotice("");
-    setMode("text");
-  }
-
-  function chooseMode(nextMode: "text" | "audio") {
-    if (nextMode !== "audio") cancelPlayback();
-    setMode(nextMode);
+    setActiveTab("conversation");
   }
 
   function chooseLibrary(id: string) {
@@ -525,7 +608,7 @@ export function ReviewLibrary({
       if (!mountedRef.current || fallbackStarted || sequence !== playbackSequenceRef.current) return;
       fallbackStarted = true;
       audioRef.current = null;
-      setAudioNotice("ElevenLabs 本次未能生成语音，已切换到浏览器英语语音。请在设置中检查密钥或额度。");
+      setAudioNotice("Fish Audio 本次未能生成语音，已切换到浏览器英语语音。请在设置中检查密钥或额度。");
       speak(fallbackText, speed, finish);
     };
 
@@ -535,7 +618,7 @@ export function ReviewLibrary({
         const response = await fetch("/api/tts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reviewId: sourceReviewId, cardId, variant, speed }),
+          body: JSON.stringify({ reviewId: sourceReviewId, cardId, variant, speed, provider: ttsProvider }),
         });
         if (!response.ok) throw new Error("TTS unavailable");
         const audioBlob = await response.blob();
@@ -550,6 +633,7 @@ export function ReviewLibrary({
       if (sequence !== playbackSequenceRef.current) return;
 
       const audio = new Audio(objectUrl);
+      audio.playbackRate = speed;
       audioRef.current = audio;
       audio.onended = finish;
       audio.onerror = fallbackToBrowser;
@@ -570,7 +654,13 @@ export function ReviewLibrary({
     </aside>
 
     <section className="min-w-0 rounded-2xl border border-[#dce4dc] bg-white p-5 sm:p-8">
-      {review ? <>
+      <div className="flex gap-1 rounded-xl bg-[#f3f6f2] p-1.5" role="tablist" aria-label="复习内容">
+        <button type="button" role="tab" aria-selected={activeTab === "conversation"} onClick={() => { cancelPlayback(); setActiveTab("conversation"); }} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-extrabold transition ${activeTab === "conversation" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078] hover:text-[#41514b]"}`}><ChatCircleDots size={17} />对话复习</button>
+        <button type="button" role="tab" aria-selected={activeTab === "history"} onClick={() => { cancelPlayback(); setActiveTab("history"); }} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-extrabold transition ${activeTab === "history" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078] hover:text-[#41514b]"}`}><Stack size={17} />旧题复习</button>
+        <button type="button" role="tab" aria-selected={activeTab === "audio"} onClick={() => setActiveTab("audio")} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-extrabold transition ${activeTab === "audio" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078] hover:text-[#41514b]"}`}><Headphones size={17} />听力跟读</button>
+      </div>
+
+      {activeTab === "conversation" ? <LatestConversationReview items={library.latestConversationItems} reviewDate={library.latestConversationDate} /> : review ? <>
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#e3e9e3] pb-6">
           <div>
             <p className="text-xs font-extrabold tracking-[0.14em] text-[#2f755f]">{review.date} · {review.level} · {review.duration} 分钟</p>
@@ -584,12 +674,7 @@ export function ReviewLibrary({
           </label>}
         </div>
 
-        <div className="mt-6 flex gap-2 rounded-xl bg-[#f3f6f2] p-1.5" role="group" aria-label="复习模式">
-          <button type="button" aria-pressed={mode === "text"} onClick={() => chooseMode("text")} className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-extrabold ${mode === "text" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078]"}`}>文字复习</button>
-          <button type="button" aria-pressed={mode === "audio"} onClick={() => chooseMode("audio")} className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-extrabold ${mode === "audio" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078]"}`}>听力与跟读 · {review.audioCards.length}</button>
-        </div>
-
-        <div className="mt-8">{mode === "text" ? (
+        <div className="mt-8">{activeTab === "history" ? (
           review.cards.length ? <ReviewCards cards={review.cards} states={cardStates} onReveal={revealCard} onSubmit={submitAttempt} sessionAnsweredItemIds={sessionAnsweredItemIds} /> : <MarkdownReview markdown={review.markdown} />
         ) : (
           <div className="space-y-4">
@@ -620,14 +705,14 @@ export function ReviewLibrary({
                     onClick={() => setVisibleAudioTranscripts((current) => ({ ...current, [stateKey]: !transcriptVisible }))}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-[#c8d5cd] bg-white px-3 py-2 text-xs font-extrabold text-[#315f4f] transition hover:bg-[#edf5ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f755f]"
                   >
-                    <EyeIcon open={transcriptVisible} />
+                    {transcriptVisible ? <EyeSlash size={16} /> : <Eye size={16} />}
                     {transcriptVisible ? "隐藏原文" : "显示原文"}
                   </button>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => playAudio(normalPlaybackId, review.id, card.id, "normal", card.normal, 1)} className="rounded-lg bg-[#172223] px-4 py-2 text-sm font-bold text-white">{playing === normalPlaybackId ? "正在播放…" : "▶ 正常语速"}</button>
-                  <button type="button" onClick={() => playAudio(slowPlaybackId, review.id, card.id, "slow", card.slow || card.normal, 0.75)} className="rounded-lg border border-[#b9c9bf] px-4 py-2 text-sm font-bold text-[#315f4f]">{playing === slowPlaybackId ? "正在播放…" : "慢速跟读"}</button>
+                  <button type="button" aria-label="播放正常语速" title="正常语速" onClick={() => playAudio(normalPlaybackId, review.id, card.id, "normal", card.normal, 1)} className="grid size-10 place-items-center rounded-xl bg-[#172223] text-white transition hover:bg-[#2d3c3c] active:translate-y-px"><Play size={17} weight="fill" /></button>
+                  <button type="button" aria-label="播放慢速语音" title="慢速语音" onClick={() => playAudio(slowPlaybackId, review.id, card.id, "slow", card.slow || card.normal, 0.75)} className="flex h-10 items-center gap-1.5 rounded-xl border border-[#b9c9bf] px-3 text-xs font-bold text-[#315f4f] transition hover:bg-[#edf5ef] active:translate-y-px"><SpeakerHigh size={16} />0.75×</button>
                 </div>
 
                 <label htmlFor={inputId} className="mt-5 block text-sm font-extrabold text-[#41514b]">写下你听到的英文</label>

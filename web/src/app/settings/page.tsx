@@ -4,34 +4,76 @@ import { currentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LogoutButton } from "@/components/logout-button";
 import { WorkerTokenPanel, type WorkerDevice } from "@/components/worker-token-panel";
+import { FishAudioPanel } from "@/components/fish-audio-panel";
+import { getFishAudioStatus, type FishAudioStatus } from "@/lib/fish-audio";
 import { ElevenLabsPanel } from "@/components/elevenlabs-panel";
-import {
-  DEFAULT_ELEVENLABS_MODEL_ID,
-  DEFAULT_ELEVENLABS_VOICE_ID,
-  getElevenLabsStatus,
-  type ElevenLabsStatus,
-} from "@/lib/elevenlabs";
+import { getElevenLabsStatus, type ElevenLabsStatus } from "@/lib/elevenlabs";
+import { VoiceProviderPreference } from "@/components/voice-provider-preference";
 
 export default async function SettingsPage() {
   const user = await currentUser();
   if (!user) redirect("/login");
-  const { data } = await createAdminClient().from("worker_devices").select("id,display_name,created_at,last_seen_at,revoked_at").eq("user_id", user.id).order("created_at", { ascending: false });
-  const devices: WorkerDevice[] = (data ?? []).map((device) => ({ id: device.id, displayName: device.display_name, createdAt: device.created_at, lastSeenAt: device.last_seen_at, revokedAt: device.revoked_at }));
+
+  const { data } = await createAdminClient()
+    .from("worker_devices")
+    .select("id,display_name,created_at,last_seen_at,revoked_at")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  const devices: WorkerDevice[] = (data ?? []).map((device) => ({
+    id: device.id,
+    displayName: device.display_name,
+    createdAt: device.created_at,
+    lastSeenAt: device.last_seen_at,
+    revokedAt: device.revoked_at,
+  }));
+
+  let fishAudioStatus: FishAudioStatus = {
+    configured: false,
+    keySuffix: null,
+    metadata: { referenceId: null, modelId: "s2-pro" },
+  };
   let elevenLabsStatus: ElevenLabsStatus = {
     configured: false,
     keySuffix: null,
-    metadata: {
-      voiceId: DEFAULT_ELEVENLABS_VOICE_ID,
-      modelId: DEFAULT_ELEVENLABS_MODEL_ID,
-    },
+    metadata: { voiceId: "JBFqnCBsd6RMkjVDRZzb", modelId: "eleven_flash_v2_5" },
   };
-  let elevenLabsLoadError = false;
   try {
-    elevenLabsStatus = await getElevenLabsStatus(user.id);
+    [fishAudioStatus, elevenLabsStatus] = await Promise.all([
+      getFishAudioStatus(user.id),
+      getElevenLabsStatus(user.id),
+    ]);
   } catch {
-    // Keep settings usable while a newly deployed migration is being applied.
-    elevenLabsLoadError = true;
+    // Keep the rest of Settings available while a migration is being applied.
   }
 
-  return <main className="min-h-screen bg-[#f7f7f2] px-5 py-8 text-[#172223] sm:px-10"><div className="mx-auto max-w-4xl"><nav className="flex items-center justify-between"><Link href="/review" className="font-black">Chat Review</Link><Link href="/review" className="rounded-lg px-3 py-2 text-sm font-bold text-[#4e8a70] hover:bg-white">← 返回复习</Link></nav><header className="mt-12"><p className="text-sm font-extrabold tracking-[0.16em] text-[#4e8a70]">ACCOUNT SETTINGS</p><h1 className="mt-3 text-4xl font-black sm:text-5xl">设置</h1><p className="mt-4 text-[#596861]">管理账号、本机 Worker 与语音服务连接。</p></header><section className="mt-8 rounded-2xl border border-[#dce4dc] bg-white p-6"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-extrabold tracking-[0.12em] text-[#6d7a74]">账号</p><p className="mt-2 font-extrabold">{user.email ?? "已登录用户"}</p><p className="mt-1 text-sm text-[#76837c]">通过 Supabase 安全认证</p></div><LogoutButton /></div></section><div className="mt-6"><ElevenLabsPanel initialStatus={elevenLabsStatus} initialLoadError={elevenLabsLoadError} /></div><div className="mt-6"><WorkerTokenPanel devices={devices} /></div></div></main>;
+  return (
+    <main className="min-h-screen bg-[#f4f6f3] px-4 py-5 text-[#172223] sm:px-10 sm:py-8">
+      <div className="mx-auto max-w-4xl">
+        <nav className="flex items-center justify-between">
+          <Link href="/review" className="font-black">Chat Review</Link>
+          <Link href="/review" className="rounded-lg px-3 py-2 text-sm font-bold text-[#4e8a70] hover:bg-white">返回复习</Link>
+        </nav>
+        <header className="mt-12">
+          <p className="text-sm font-extrabold tracking-[0.16em] text-[#4e8a70]">SETTINGS</p>
+          <h1 className="mt-3 text-4xl font-black sm:text-5xl">设置</h1>
+          <p className="mt-4 text-[#596861]">管理账号、本机同步设备与语音服务。</p>
+        </header>
+        <section className="mt-8 rounded-2xl border border-[#dce4dc] bg-white p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-extrabold tracking-[0.12em] text-[#6d7a74]">账号</p>
+              <p className="mt-2 font-extrabold">{user.email ?? "已登录用户"}</p>
+              <p className="mt-1 text-sm text-[#76837c]">通过 Supabase 安全认证</p>
+            </div>
+            <LogoutButton />
+          </div>
+        </section>
+        <div className="mt-6"><VoiceProviderPreference fishConfigured={fishAudioStatus.configured} elevenLabsConfigured={elevenLabsStatus.configured} /></div>
+        <div className="mt-6"><FishAudioPanel initialStatus={fishAudioStatus} /></div>
+        <div className="mt-6"><ElevenLabsPanel initialStatus={elevenLabsStatus} /></div>
+        <div className="mt-6"><WorkerTokenPanel devices={devices} /></div>
+      </div>
+    </main>
+  );
 }

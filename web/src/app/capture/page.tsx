@@ -30,7 +30,7 @@ export default async function CapturePage() {
         <header className="mt-12">
           <p className="text-sm font-extrabold tracking-[0.16em] text-[#4e8a70]">CAPTURE WHAT YOU LEARNED</p>
           <h1 className="mt-3 text-4xl font-black sm:text-5xl">添加学习内容</h1>
-          <p className="mt-4 max-w-2xl leading-7 text-[#596861]">把今天练习中值得记住的问题和答案直接放进复习系统，不再依赖聊天项目自动读取。</p>
+          <p className="mt-4 max-w-2xl leading-7 text-[#596861]">把 English Tranning 对话中不会、想复习的问题和答案放进复习系统。若内容来自昨天的对话，请把学习日期选为昨天；系统会在今天安排首次复习。</p>
         </header>
         {error && <p className="mt-8 rounded-xl bg-red-50 p-4 text-sm text-red-700" role="alert">知识库加载失败，请刷新后重试。</p>}
         <LearningCaptureForm spaces={spaces} />

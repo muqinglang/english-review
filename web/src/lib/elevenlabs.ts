@@ -168,3 +168,23 @@ export async function getElevenLabsCredential(
     metadata: normalizeElevenLabsMetadata(data.metadata),
   };
 }
+
+export async function synthesizeElevenLabsAudio(
+  credential: { apiKey: string; metadata: ElevenLabsMetadata },
+  text: string,
+) {
+  return fetch(
+    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(credential.metadata.voiceId)}/stream?output_format=mp3_44100_128`,
+    {
+      method: "POST",
+      headers: {
+        accept: "audio/mpeg",
+        "content-type": "application/json",
+        "xi-api-key": credential.apiKey,
+      },
+      body: JSON.stringify({ text, model_id: credential.metadata.modelId }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(30_000),
+    },
+  );
+}

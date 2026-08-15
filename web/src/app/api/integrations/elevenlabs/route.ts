@@ -77,7 +77,7 @@ export async function DELETE() {
     });
   } catch {
     return Response.json(
-      { message: "无法断开 ElevenLabs。" },
+      { message: "无法删除 ElevenLabs 配置。" },
       { status: 500 },
     );
   }

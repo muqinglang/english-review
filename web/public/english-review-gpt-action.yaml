@@ -1,0 +1,74 @@
+openapi: 3.1.0
+info:
+  title: English Review Practice Sync
+  version: 1.0.0
+  description: Save independently assessable English learning items from a completed practice session.
+servers:
+  - url: https://english-review-three.vercel.app
+paths:
+  /api/worker/push:
+    post:
+      operationId: saveCompletedEnglishPractice
+      summary: Save items that the learner did not know or needs to review.
+      description: Use only after an English practice session is complete. One item must contain exactly one independently assessable vocabulary item, expression, grammar correction, or pronunciation point. Never combine independent items with semicolons, slashes, enumeration commas, or lists.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [space, practiceDate, items]
+              properties:
+                space:
+                  type: string
+                  enum: [English Review]
+                practiceDate:
+                  type: string
+                  format: date
+                  description: Shanghai date on which the practice happened.
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [normalizedKey, type, cue, answer, example]
+                    properties:
+                      normalizedKey:
+                        type: string
+                        description: Stable lowercase key for exactly one learning point.
+                      type:
+                        type: string
+                        enum: [vocabulary, expression, grammar, error, pronunciation]
+                      cue:
+                        type: string
+                        description: One concise active-recall prompt in Chinese or English.
+                      answer:
+                        type: string
+                        description: Concise core answer only, without lists or extended explanation.
+                      example:
+                        type: string
+                        description: A single-line JSON string, not plain text. Required shape: {"meaning":"Chinese core meaning","explanation":"plain Chinese explanation","usageTip":"usage or confusion reminder","examples":[{"scenario":"real-life scenario","english":"Natural English sentence.","chinese":"Chinese translation."},{"scenario":"different real-life scenario","english":"Natural English sentence.","chinese":"Chinese translation."},{"scenario":"third different real-life scenario","english":"Natural English sentence.","chinese":"Chinese translation."}]}. Use at least three genuinely different daily-life scenarios. Escape the inner quotes so the outer request remains valid JSON.
+                      priority:
+                        type: string
+                        enum: [high, medium, low]
+                      occurrences:
+                        type: integer
+                        minimum: 1
+                        default: 1
+      responses:
+        "200":
+          description: Items were accepted and scheduled.
+        "400":
+          description: Invalid or non-atomic learning items.
+        "401":
+          description: Missing, invalid, or revoked token.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer

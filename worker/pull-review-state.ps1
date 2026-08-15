@@ -63,20 +63,27 @@ $token = ConvertFrom-WorkerSecureString -SecureValue $secureToken
 $ledgerPath = (Resolve-Path -LiteralPath $LedgerFile).Path
 $encodedSpace = [Uri]::EscapeDataString($Space)
 $uri = "$ApiBase/api/worker/context?space=$encodedSpace"
+$httpClient = $null
 
 try {
   Write-Verbose "Pulling cloud review state for '$Space'."
-  $response = Invoke-RestMethod -Method Get -Uri $uri -Headers @{ Authorization = "Bearer $token" } -TimeoutSec $TimeoutSec -ErrorAction Stop
-}
-catch [Net.WebException] {
-  $responseBody = ""
-  if ($_.Exception.Response) {
-    $reader = New-Object IO.StreamReader($_.Exception.Response.GetResponseStream())
-    try { $responseBody = $reader.ReadToEnd() } finally { $reader.Dispose() }
+  Add-Type -AssemblyName System.Net.Http
+  $httpClient = [Net.Http.HttpClient]::new()
+  $httpClient.Timeout = [TimeSpan]::FromSeconds($TimeoutSec)
+  $httpClient.DefaultRequestHeaders.Authorization = [Net.Http.Headers.AuthenticationHeaderValue]::new("Bearer", $token)
+  $httpResponse = $httpClient.GetAsync($uri).GetAwaiter().GetResult()
+  $responseBytes = $httpResponse.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult()
+  $responseBody = [Text.Encoding]::UTF8.GetString($responseBytes)
+  if (-not $httpResponse.IsSuccessStatusCode) {
+    throw "HTTP $([int]$httpResponse.StatusCode): $responseBody"
   }
-  throw "Worker context request failed: $responseBody"
+  $response = $responseBody | ConvertFrom-Json
+}
+catch {
+  throw "Worker context request failed: $($_.Exception.Message)"
 }
 finally {
+  if ($httpClient) { $httpClient.Dispose() }
   $token = $null
   $secureToken = $null
 }

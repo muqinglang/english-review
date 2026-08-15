@@ -1,8 +1,9 @@
+import { createHash } from "node:crypto";
 import { bearerToken, isIsoDate, shanghaiDate } from "@/lib/srs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify, workerTokenHash } from "@/lib/worker";
 
-const ITEM_TYPES = ["fact", "concept", "decision", "quote", "vocabulary", "expression", "error", "pronunciation"] as const;
+const ITEM_TYPES = ["fact", "concept", "decision", "quote", "vocabulary", "expression", "grammar", "error", "pronunciation"] as const;
 const PRIORITIES = ["high", "medium", "low"] as const;
 
 type ItemType = (typeof ITEM_TYPES)[number];
@@ -39,6 +40,32 @@ function nonEmptyString(value: unknown, maxLength: number) {
   return trimmed && trimmed.length <= maxLength ? trimmed : null;
 }
 
+function normalizeExample(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed && trimmed.length <= 20_000 ? trimmed : null;
+  }
+  if (!isRecord(value)) return null;
+
+  const meaning = nonEmptyString(value.meaning, 2_000);
+  const explanation = nonEmptyString(value.explanation, 6_000);
+  const usageTip = nonEmptyString(value.usageTip, 4_000);
+  if (!meaning || !explanation || !usageTip || !Array.isArray(value.examples) || value.examples.length < 3 || value.examples.length > 8) return null;
+
+  const examples = value.examples.map((raw) => {
+    if (!isRecord(raw)) return null;
+    const scenario = nonEmptyString(raw.scenario, 500);
+    const english = nonEmptyString(raw.english, 3_000);
+    const chinese = nonEmptyString(raw.chinese, 3_000);
+    return scenario && english && chinese ? { scenario, english, chinese } : null;
+  });
+  if (examples.some((example) => !example)) return null;
+
+  const serialized = JSON.stringify({ meaning, explanation, usageTip, examples });
+  return serialized.length <= 20_000 ? serialized : null;
+}
+
 function validateItems(value: unknown): ValidatedItem[] | null {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > 100) return null;
@@ -53,8 +80,8 @@ function validateItems(value: unknown): ValidatedItem[] | null {
     if (!normalizedKey || !cue || !answer || keys.has(normalizedKey)) return null;
     if (typeof raw.type !== "string" || !ITEM_TYPES.includes(raw.type as ItemType)) return null;
     if (raw.priority !== undefined && (typeof raw.priority !== "string" || !PRIORITIES.includes(raw.priority as Priority))) return null;
-    if (raw.example !== undefined && raw.example !== null && typeof raw.example !== "string") return null;
-    if (typeof raw.example === "string" && raw.example.length > 20_000) return null;
+    const example = normalizeExample(raw.example);
+    if (raw.example !== undefined && raw.example !== null && !example) return null;
     if (raw.occurrences !== undefined && (!Number.isInteger(raw.occurrences) || Number(raw.occurrences) <= 0 || Number(raw.occurrences) > 1_000_000)) return null;
     if (raw.dueDate !== undefined && raw.dueDate !== null && !isIsoDate(raw.dueDate)) return null;
     if (raw.learnedOn !== undefined && raw.learnedOn !== null && !isIsoDate(raw.learnedOn)) return null;
@@ -65,7 +92,7 @@ function validateItems(value: unknown): ValidatedItem[] | null {
       type: raw.type as ItemType,
       cue,
       answer,
-      example: typeof raw.example === "string" ? raw.example.trim() || null : null,
+      example,
       priority: (raw.priority as Priority | undefined) ?? "medium",
       occurrences: raw.occurrences === undefined ? 1 : Number(raw.occurrences),
       dueDate: typeof raw.dueDate === "string" ? raw.dueDate : null,
@@ -137,12 +164,22 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   if (!isRecord(body)) return Response.json({ message: "推送格式无效。" }, { status: 400 });
   const displayName = nonEmptyString(body.space, 80);
+  const practiceDate = body.practiceDate === undefined ? null : nonEmptyString(body.practiceDate, 10);
+  const isGptPracticeSync = practiceDate !== null;
+  const today = shanghaiDate();
+  if (practiceDate !== null && (!isIsoDate(practiceDate) || practiceDate > today)) {
+    return Response.json({ message: "练习日期必须是今天或过去的上海日期。" }, { status: 400 });
+  }
   const items = validateItems(body.items);
   const review = body.review === undefined ? null : validateReview(body.review);
-  if (!displayName || !items || (body.review !== undefined && !review) || (!items.length && !review)) {
+  if (!displayName || !items || (body.review !== undefined && !review) || (!items.length && !review) || (isGptPracticeSync && review)) {
     return Response.json({ message: "推送格式无效；space、学习项和复习包字段必须非空且唯一。" }, { status: 400 });
   }
-  const itemByKey = new Map(items.map((item) => [item.normalizedKey, item]));
+  if (isGptPracticeSync && items.some((item) => /[;；/、]/.test(`${item.normalizedKey}${item.cue}${item.answer}`))) {
+    return Response.json({ message: "每个学习项只能包含一个独立知识点；请拆分并列词汇、短语或语法点后重试。" }, { status: 400 });
+  }
+  const scheduledItems = items;
+  const itemByKey = new Map(scheduledItems.map((item) => [item.normalizedKey, item]));
   const orderedReviewItems = review ? review.itemKeys.map((key) => itemByKey.get(key)) : [];
   if (review && (items.length !== review.itemKeys.length || orderedReviewItems.some((item) => !item))) {
     return Response.json({ message: "复习包中的 items 必须与 review.itemKeys 完整对应。" }, { status: 400 });
@@ -158,16 +195,88 @@ export async function POST(request: Request) {
     return Response.json({ message: "无法保存知识库。" }, { status: 500 });
   }
 
+  // A ChatGPT conversation is a short-term practice session, not an immediate
+  // long-term SRS item. It enters learning_items only after the learner gives
+  // the first self-grade in the "yesterday conversation" queue.
+  if (isGptPracticeSync && practiceDate) {
+    const payloadHash = createHash("sha256")
+      .update(JSON.stringify({ practiceDate, items: items.map((item) => ({
+        normalizedKey: item.normalizedKey,
+        type: item.type,
+        cue: item.cue,
+        answer: item.answer,
+        example: item.example,
+        priority: item.priority,
+        occurrences: item.occurrences,
+      })) }), "utf8")
+      .digest("hex");
+    const { error: sessionInsertError } = await admin
+      .from("practice_sessions")
+      .upsert({
+        user_id: device.user_id,
+        knowledge_space_id: space.id,
+        source: "chatgpt_chrome",
+        practice_date: practiceDate,
+        payload_hash: payloadHash,
+        item_count: items.length,
+      }, { onConflict: "user_id,source,payload_hash", ignoreDuplicates: true });
+    if (sessionInsertError) {
+      console.error("Practice-session save failed", sessionInsertError);
+      return Response.json({ message: "无法保存对话练习。" }, { status: 500 });
+    }
+    const { data: session, error: sessionError } = await admin
+      .from("practice_sessions")
+      .select("id")
+      .eq("user_id", device.user_id)
+      .eq("source", "chatgpt_chrome")
+      .eq("payload_hash", payloadHash)
+      .maybeSingle();
+    if (sessionError || !session) {
+      console.error("Practice-session lookup failed", sessionError);
+      return Response.json({ message: "无法确认对话练习已保存。" }, { status: 500 });
+    }
+    const { data: practiceItems, error: practiceItemsError } = await admin
+      .from("practice_items")
+      .upsert(items.map((item) => ({
+        user_id: device.user_id,
+        practice_session_id: session.id,
+        normalized_key: item.normalizedKey,
+        type: item.type,
+        cue: item.cue,
+        answer: item.answer,
+        example: item.example,
+        priority: item.priority,
+        occurrences: item.occurrences,
+      })), { onConflict: "practice_session_id,normalized_key" })
+      .select("id");
+    if (practiceItemsError || !practiceItems || practiceItems.length !== items.length) {
+      console.error("Practice-item save failed", practiceItemsError);
+      return Response.json({ message: "无法保存全部对话学习项。" }, { status: 500 });
+    }
+    const { error: jobsError } = await admin
+      .from("generation_jobs")
+      .upsert(practiceItems.flatMap((item) => ([
+        { user_id: device.user_id, practice_item_id: item.id, kind: "enrichment" },
+        { user_id: device.user_id, practice_item_id: item.id, kind: "tts_audio" },
+      ])), { onConflict: "practice_item_id,kind", ignoreDuplicates: true });
+    if (jobsError) {
+      console.error("Generation-job queue failed", jobsError);
+      return Response.json({ message: "对话已保存，但无法创建内容生成任务。" }, { status: 500 });
+    }
+    await admin.from("worker_devices").update({ last_seen_at: new Date().toISOString() }).eq("id", device.id);
+    const richItemCount = items.filter((item) => item.example?.trim().startsWith("{")).length;
+    return Response.json({ ok: true, knowledgeSpace: displayName, accepted: items.length, richItemCount, practiceSessionId: session.id, reviewSaved: false, reviewId: null, reviewDate: null });
+  }
+
   const now = new Date().toISOString();
-  const today = shanghaiDate();
   // Standalone item pushes keep their existing behavior. Review pushes use the
   // transactional RPC below so item content and card mappings cannot diverge.
-  if (items.length && !review) {
+  if (scheduledItems.length && !review) {
     const { data: existingItems, error: existingItemsError } = await admin
       .from("learning_items")
       .select("normalized_key,knowledge_space_id")
       .eq("user_id", device.user_id)
-      .in("normalized_key", items.map((item) => item.normalizedKey));
+      .in("normalized_key", scheduledItems.map((item) => item.normalizedKey));
     if (existingItemsError) {
       console.error("Existing learning-item lookup failed", existingItemsError);
       return Response.json({ message: "无法检查已有学习项。" }, { status: 500 });
@@ -178,7 +287,7 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
-    const insertRows = items.map((item) => ({
+    const insertRows = scheduledItems.map((item) => ({
       user_id: device.user_id,
       knowledge_space_id: space.id,
       normalized_key: item.normalizedKey,
@@ -201,7 +310,7 @@ export async function POST(request: Request) {
 
     // Only content/source fields are updated here. SRS state and next_due are
     // intentionally omitted so a Worker sync cannot undo a learner's answer.
-    const updates = await Promise.all(items.map((item) => admin
+    const updates = await Promise.all(scheduledItems.map((item) => admin
       .from("learning_items")
       .update({
         type: item.type,
@@ -285,7 +394,7 @@ export async function POST(request: Request) {
   return Response.json({
     ok: true,
     knowledgeSpace: displayName,
-    accepted: items.length,
+    accepted: scheduledItems.length,
     reviewSaved,
     reviewId,
     reviewDate,

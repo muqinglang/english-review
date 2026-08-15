@@ -52,7 +52,7 @@ export function ElevenLabsPanel({
       setVoiceId(body.metadata.voiceId);
       setModelId(body.metadata.modelId);
       setLoadError(false);
-      setNotice("ElevenLabs 配置已保存。");
+      setNotice("ElevenLabs 凭据已保存，尚未验证可用性。");
     } catch {
       setError("无法连接设置服务，请检查网络后重试。");
     } finally {
@@ -61,7 +61,7 @@ export function ElevenLabsPanel({
   }
 
   async function disconnect() {
-    if (!window.confirm("确定断开 ElevenLabs 并删除已保存的 API Key 吗？")) {
+    if (!window.confirm("确定删除已保存的 ElevenLabs API Key 吗？")) {
       return;
     }
 
@@ -75,7 +75,7 @@ export function ElevenLabsPanel({
       const body = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setError(body.message ?? "无法断开 ElevenLabs。");
+        setError(body.message ?? "无法删除 ElevenLabs 配置。");
         return;
       }
 
@@ -84,7 +84,7 @@ export function ElevenLabsPanel({
       setVoiceId(body.metadata.voiceId);
       setModelId(body.metadata.modelId);
       setLoadError(false);
-      setNotice("ElevenLabs 已断开。");
+      setNotice("ElevenLabs 凭据已删除。");
     } catch {
       setError("无法连接设置服务，请检查网络后重试。");
     } finally {
@@ -119,7 +119,7 @@ export function ElevenLabsPanel({
               : "bg-[#eeeeea] text-[#788179]"
           }`}
         >
-          {status.configured ? "已连接" : "未连接"}
+          {status.configured ? "已保存凭据" : "未配置"}
         </span>
       </div>
 
@@ -195,7 +195,7 @@ export function ElevenLabsPanel({
             disabled={busy}
             className="rounded-xl border border-red-200 px-5 py-3 font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
           >
-            断开连接
+            删除凭据
           </button>
         )}
       </div>

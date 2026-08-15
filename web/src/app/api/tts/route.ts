@@ -1,5 +1,6 @@
 import { currentUser } from "@/lib/auth";
-import { getElevenLabsCredential } from "@/lib/elevenlabs";
+import { getFishAudioCredential, synthesizeFishAudio } from "@/lib/fish-audio";
+import { getElevenLabsCredential, synthesizeElevenLabsAudio } from "@/lib/elevenlabs";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -7,6 +8,7 @@ export const runtime = "nodejs";
 const MAX_TEXT_LENGTH = 1_000;
 const MIN_SPEED = 0.7;
 const MAX_SPEED = 1.2;
+type TtsProvider = "fish_audio" | "elevenlabs";
 
 type AudioCard = {
   id: string;
@@ -66,6 +68,7 @@ export async function POST(request: Request) {
 
   const input = body as Record<string, unknown>;
   const cardId = typeof input.cardId === "string" ? input.cardId.trim() : "";
+  const provider: TtsProvider = input.provider === "elevenlabs" ? "elevenlabs" : "fish_audio";
   if (!isUuid(input.reviewId) || !cardId || cardId.length > 240) {
     return Response.json(
       { message: "复习或音频卡片 ID 无效。" },
@@ -124,23 +127,6 @@ export async function POST(request: Request) {
     );
   }
 
-  let credential: Awaited<ReturnType<typeof getElevenLabsCredential>>;
-  try {
-    credential = await getElevenLabsCredential(user.id);
-  } catch {
-    return Response.json(
-      { message: "无法读取语音服务配置。" },
-      { status: 500 },
-    );
-  }
-
-  if (!credential) {
-    return Response.json(
-      { message: "请先在设置中连接 ElevenLabs。" },
-      { status: 409 },
-    );
-  }
-
   const characterCount = Array.from(text).length;
   const { data: reserved, error: reservationError } = await admin.rpc(
     "reserve_tts_usage",
@@ -157,37 +143,25 @@ export async function POST(request: Request) {
   }
   if (reserved !== true) {
     return Response.json(
-      { message: "今天的 ElevenLabs 使用额度已达上限，请明天再试。" },
+      { message: "今天的语音生成额度已达上限，请明天再试。" },
       { status: 429 },
     );
   }
 
-  const endpoint = new URL(
-    `/v1/text-to-speech/${encodeURIComponent(credential.metadata.voiceId)}`,
-    "https://api.elevenlabs.io",
-  );
-  endpoint.searchParams.set("output_format", "mp3_44100_128");
-
   let upstream: Response;
   try {
-    upstream = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        accept: "audio/mpeg",
-        "content-type": "application/json",
-        "xi-api-key": credential.apiKey,
-      },
-      body: JSON.stringify({
-        text,
-        model_id: credential.metadata.modelId,
-        voice_settings: { speed },
-      }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(30_000),
-    });
+    if (provider === "elevenlabs") {
+      const credential = await getElevenLabsCredential(user.id);
+      if (!credential) return Response.json({ message: "请先在设置中连接 ElevenLabs。" }, { status: 409 });
+      upstream = await synthesizeElevenLabsAudio(credential, text);
+    } else {
+      const credential = await getFishAudioCredential(user.id);
+      if (!credential) return Response.json({ message: "请先在设置中连接 Fish Audio。" }, { status: 409 });
+      upstream = await synthesizeFishAudio(credential, text);
+    }
   } catch {
     return Response.json(
-      { message: "ElevenLabs 暂时无法连接，请稍后重试。" },
+      { message: "语音服务暂时无法连接，请稍后重试。" },
       { status: 502 },
     );
   }
@@ -195,12 +169,12 @@ export async function POST(request: Request) {
   if (!upstream.ok || !upstream.body) {
     if (upstream.status === 429) {
       return Response.json(
-        { message: "ElevenLabs 请求过于频繁或额度不足。" },
+        { message: `${provider === "elevenlabs" ? "ElevenLabs" : "Fish Audio"} 额度不足或请求过于频繁。` },
         { status: 429 },
       );
     }
     return Response.json(
-      { message: "ElevenLabs 未能生成语音，请检查配置或稍后重试。" },
+      { message: `${provider === "elevenlabs" ? "ElevenLabs" : "Fish Audio"} 未能生成语音，请检查配置或稍后重试。` },
       { status: 502 },
     );
   }
