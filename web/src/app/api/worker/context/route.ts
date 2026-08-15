@@ -1,3 +1,4 @@
+import { resolveAccountId } from "@/lib/account-aliases";
 import { bearerToken, shanghaiDate, toScheduleItem, type LearningItemRecord } from "@/lib/srs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify, workerTokenHash } from "@/lib/worker";
@@ -27,10 +28,14 @@ export async function GET(request: Request) {
   }
   if (!device) return Response.json({ message: "Worker 令牌无效或已撤销。" }, { status: 401 });
 
+  // Read under the canonical owner so a token registered on a secondary account
+  // still sees the shared dataset (mirrors the web session and the push route).
+  const ownerId = resolveAccountId(device.user_id);
+
   const { data: space, error: spaceError } = await admin
     .from("knowledge_spaces")
     .select("id,display_name")
-    .eq("user_id", device.user_id)
+    .eq("user_id", ownerId)
     .eq("slug", slugify(requestedSpace))
     .maybeSingle();
 
@@ -43,7 +48,7 @@ export async function GET(request: Request) {
   const { data, error } = await admin
     .from("learning_items")
     .select("id,normalized_key,type,cue,answer,example,priority,occurrences,attempts,correct,next_due,learned_on,last_shown,status,review_stage,correct_streak,last_result,last_answered_at")
-    .eq("user_id", device.user_id)
+    .eq("user_id", ownerId)
     .eq("knowledge_space_id", space.id)
     .order("next_due", { ascending: true })
     .limit(1000);

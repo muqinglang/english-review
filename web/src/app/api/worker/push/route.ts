@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { resolveAccountId } from "@/lib/account-aliases";
 import { bearerToken, isIsoDate, shanghaiDate } from "@/lib/srs";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { slugify, workerTokenHash } from "@/lib/worker";
@@ -74,6 +75,13 @@ export async function POST(request: Request) {
   }
   if (!device) return Response.json({ message: "Worker 令牌无效或已撤销。" }, { status: 401 });
 
+  // A device row may hold a secondary account id (e.g. a token registered before
+  // account aliasing shipped). Resolve to the canonical owner so Worker syncs land
+  // under the same dataset the web session reads — otherwise data is stranded on
+  // the secondary account and never appears in review. device.id is the device
+  // row PK and stays as-is for last_seen bookkeeping below.
+  const ownerId = resolveAccountId(device.user_id);
+
   const body = await request.json().catch(() => null);
   if (!isRecord(body)) return Response.json({ message: "推送格式无效。" }, { status: 400 });
   const displayName = nonEmptyString(body.space, 80);
@@ -103,7 +111,7 @@ export async function POST(request: Request) {
 
   const { data: space, error: spaceError } = await admin
     .from("knowledge_spaces")
-    .upsert({ user_id: device.user_id, slug: slugify(displayName), display_name: displayName }, { onConflict: "user_id,slug" })
+    .upsert({ user_id: ownerId, slug: slugify(displayName), display_name: displayName }, { onConflict: "user_id,slug" })
     .select("id")
     .single();
   if (spaceError || !space) {
@@ -129,7 +137,7 @@ export async function POST(request: Request) {
     const { error: sessionInsertError } = await admin
       .from("practice_sessions")
       .upsert({
-        user_id: device.user_id,
+        user_id: ownerId,
         knowledge_space_id: space.id,
         source: "chatgpt_chrome",
         practice_date: practiceDate,
@@ -143,7 +151,7 @@ export async function POST(request: Request) {
     const { data: session, error: sessionError } = await admin
       .from("practice_sessions")
       .select("id")
-      .eq("user_id", device.user_id)
+      .eq("user_id", ownerId)
       .eq("source", "chatgpt_chrome")
       .eq("payload_hash", payloadHash)
       .maybeSingle();
@@ -154,7 +162,7 @@ export async function POST(request: Request) {
     const { data: practiceItems, error: practiceItemsError } = await admin
       .from("practice_items")
       .upsert(items.map((item) => ({
-        user_id: device.user_id,
+        user_id: ownerId,
         practice_session_id: session.id,
         normalized_key: item.normalizedKey,
         type: item.type,
@@ -172,8 +180,8 @@ export async function POST(request: Request) {
     const { error: jobsError } = await admin
       .from("generation_jobs")
       .upsert(practiceItems.flatMap((item) => ([
-        { user_id: device.user_id, practice_item_id: item.id, kind: "enrichment" },
-        { user_id: device.user_id, practice_item_id: item.id, kind: "tts_audio" },
+        { user_id: ownerId, practice_item_id: item.id, kind: "enrichment" },
+        { user_id: ownerId, practice_item_id: item.id, kind: "tts_audio" },
       ])), { onConflict: "practice_item_id,kind", ignoreDuplicates: true });
     if (jobsError) {
       console.error("Generation-job queue failed", jobsError);
@@ -191,7 +199,7 @@ export async function POST(request: Request) {
     const { data: existingItems, error: existingItemsError } = await admin
       .from("learning_items")
       .select("normalized_key,knowledge_space_id")
-      .eq("user_id", device.user_id)
+      .eq("user_id", ownerId)
       .in("normalized_key", scheduledItems.map((item) => item.normalizedKey));
     if (existingItemsError) {
       console.error("Existing learning-item lookup failed", existingItemsError);
@@ -204,7 +212,7 @@ export async function POST(request: Request) {
       );
     }
     const insertRows = scheduledItems.map((item) => ({
-      user_id: device.user_id,
+      user_id: ownerId,
       knowledge_space_id: space.id,
       normalized_key: item.normalizedKey,
       type: item.type,
@@ -236,7 +244,7 @@ export async function POST(request: Request) {
         priority: item.priority,
         updated_at: now,
       })
-      .eq("user_id", device.user_id)
+      .eq("user_id", ownerId)
       .eq("knowledge_space_id", space.id)
       .eq("normalized_key", item.normalizedKey)
       .select("id")
@@ -255,7 +263,7 @@ export async function POST(request: Request) {
     // Content and mappings are saved in one PostgreSQL transaction. The RPC
     // also preserves the content of any card already graded in this review.
     const { data: savedReviewId, error: saveError } = await admin.rpc("save_daily_review_with_items", {
-      p_user_id: device.user_id,
+      p_user_id: ownerId,
       p_knowledge_space_id: space.id,
       p_review_date: review.reviewDate,
       p_content_json: {
