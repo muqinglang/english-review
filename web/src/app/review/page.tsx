@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getElevenLabsStatus, type ElevenLabsVoice } from "@/lib/elevenlabs";
 import { ReviewLibrary, type ReviewLibraryData } from "@/components/review-library";
 
 type JsonObject = Record<string, unknown>;
@@ -84,6 +85,13 @@ export default async function ReviewPage() {
       .order("created_at", { ascending: false })
       .limit(100),
   ]);
+  let elevenLabsVoices: ElevenLabsVoice[] = [];
+  try {
+    const status = await getElevenLabsStatus(user.id);
+    if (status.configured) elevenLabsVoices = status.metadata.voices;
+  } catch {
+    // Voice switching is optional; a missing/failed integration must not break review.
+  }
   let structuredLoadError = Boolean(spacesError || reviewsError || conversationItemsError);
   if (spacesError) console.error("Review knowledge-space query failed", spacesError);
   if (reviewsError) console.error("Review library query failed", reviewsError);
@@ -296,7 +304,7 @@ export default async function ReviewPage() {
           <p className="max-w-sm text-sm leading-6 text-[#596861]">先回忆，再核对。你的自评会决定下一次出现的时间。</p>
         </header>
         {libraries.length ? (
-          <ReviewLibrary libraries={libraries} loadWarning={structuredLoadError} />
+          <ReviewLibrary libraries={libraries} loadWarning={structuredLoadError} elevenLabsVoices={elevenLabsVoices} />
         ) : (
           <section className="mt-8 rounded-2xl border border-[#dce4dc] bg-white p-10 text-center">
             <h2 className="text-xl font-black">还没有复习分类</h2>

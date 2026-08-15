@@ -110,6 +110,19 @@ const statusLabels: Record<string, string> = {
   pending_confirmation: "待确认",
 };
 
+function ExamplePlayButton({ id, text, playingId, onPlay }: { id: string; text: string; playingId: string; onPlay: (id: string, text: string) => void }) {
+  const active = playingId === id;
+  return <button
+    type="button"
+    aria-label={active ? "正在朗读" : "朗读例句"}
+    title="用设置的声音朗读"
+    onClick={() => onPlay(id, text)}
+    className={`grid size-7 shrink-0 place-items-center rounded-lg border transition ${active ? "border-[#2f755f] bg-[#e2f3e8] text-[#286247]" : "border-[#c8d5cd] bg-white text-[#315f4f] hover:bg-[#edf5ef]"}`}
+  >
+    <SpeakerHigh size={15} weight={active ? "fill" : "regular"} />
+  </button>;
+}
+
 function InlineText({ text }: { text: string }) {
   const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).filter(Boolean);
   return <>{parts.map((part, index) => {
@@ -233,7 +246,7 @@ function parseRichAnswer(card: Pick<ReviewCardData, "answer" | "example">): Rich
   }
 }
 
-function LatestConversationReview({ items, reviewDate }: { items: YesterdayConversationItemData[]; reviewDate: string | null }) {
+function LatestConversationReview({ items, reviewDate, onPlay, playingId }: { items: YesterdayConversationItemData[]; reviewDate: string | null; onPlay: (id: string, text: string) => void; playingId: string }) {
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, AttemptResult>>({});
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
@@ -298,7 +311,10 @@ function LatestConversationReview({ items, reviewDate }: { items: YesterdayConve
               <p className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">生活场景</p>
               <div className="mt-3 grid gap-3 lg:grid-cols-2">
                 {richAnswer.examples.map((example, exampleIndex) => <article key={`${example.english}-${exampleIndex}`} className="rounded-xl bg-[#f3f7f2] p-4">
-                  <p className="text-xs font-extrabold text-[#2f755f]">{example.scenario ?? `场景 ${exampleIndex + 1}`}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-extrabold text-[#2f755f]">{example.scenario ?? `场景 ${exampleIndex + 1}`}</p>
+                    <ExamplePlayButton id={`conv:${item.id}:${exampleIndex}`} text={example.english} playingId={playingId} onPlay={onPlay} />
+                  </div>
                   <p className="mt-2 text-sm font-semibold leading-6 text-[#172223]">{example.english}</p>
                   {example.chinese && <p className="mt-2 text-sm leading-6 text-[#596861]">{example.chinese}</p>}
                 </article>)}
@@ -327,12 +343,16 @@ function ReviewCards({
   onReveal,
   onSubmit,
   sessionAnsweredItemIds,
+  onPlay,
+  playingId,
 }: {
   cards: ReviewCardData[];
   states: Record<string, CardState>;
   onReveal: (reviewItemId: string) => void;
   onSubmit: (card: ReviewCardData, result: AttemptResult) => void;
   sessionAnsweredItemIds: ReadonlySet<string>;
+  onPlay: (id: string, text: string) => void;
+  playingId: string;
 }) {
   // Parse each card's rich answer once; reveal/self-grade re-renders reuse it.
   const richAnswers = useMemo(
@@ -387,7 +407,10 @@ function ReviewCards({
                 </div>
                 <div className="mt-3 grid gap-3 lg:grid-cols-2">
                   {richAnswer.examples.map((example, exampleIndex) => <article key={`${example.english}-${exampleIndex}`} className="rounded-xl bg-[#f3f7f2] p-4">
-                    <p className="text-xs font-extrabold text-[#2f755f]">{example.scenario ?? `场景 ${exampleIndex + 1}`}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs font-extrabold text-[#2f755f]">{example.scenario ?? `场景 ${exampleIndex + 1}`}</p>
+                      <ExamplePlayButton id={`hist:${card.reviewItemId}:${exampleIndex}`} text={example.english} playingId={playingId} onPlay={onPlay} />
+                    </div>
                     <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-[#172223]">{example.english}</p>
                     {example.chinese && <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-[#627169]">{example.chinese}</p>}
                   </article>)}
@@ -432,14 +455,17 @@ function ReviewCards({
 export function ReviewLibrary({
   libraries,
   loadWarning = false,
+  elevenLabsVoices = [],
 }: {
   libraries: ReviewLibraryData[];
   loadWarning?: boolean;
+  elevenLabsVoices?: { voiceId: string; name: string }[];
 }) {
   const [libraryId, setLibraryId] = useState(libraries[0]?.id ?? "");
   const [reviewId, setReviewId] = useState(libraries[0]?.reviews[0]?.id ?? "");
   const [activeTab, setActiveTab] = useState<"conversation" | "history" | "audio">("conversation");
   const [ttsProvider, setTtsProvider] = useState<"fish_audio" | "elevenlabs">("fish_audio");
+  const [selectedVoiceId, setSelectedVoiceId] = useState(elevenLabsVoices[0]?.voiceId ?? "");
   const [playing, setPlaying] = useState("");
   const [audioNotice, setAudioNotice] = useState("");
   const [visibleAudioTranscripts, setVisibleAudioTranscripts] = useState<Record<string, boolean>>({});
@@ -477,11 +503,20 @@ export function ReviewLibrary({
   }, []);
   useEffect(() => {
     const saved = window.localStorage.getItem("english-review-tts-provider");
+    const savedVoice = window.localStorage.getItem("english-review-elevenlabs-voice");
     const frame = window.requestAnimationFrame(() => {
       if (saved === "fish_audio" || saved === "elevenlabs") setTtsProvider(saved);
+      if (savedVoice && elevenLabsVoices.some((voice) => voice.voiceId === savedVoice)) {
+        setSelectedVoiceId(savedVoice);
+      }
     });
     return () => window.cancelAnimationFrame(frame);
-  }, []);
+  }, [elevenLabsVoices]);
+
+  function chooseVoice(voiceId: string) {
+    setSelectedVoiceId(voiceId);
+    window.localStorage.setItem("english-review-elevenlabs-voice", voiceId);
+  }
 
   function cancelPlayback() {
     playbackSequenceRef.current += 1;
@@ -604,10 +639,12 @@ export function ReviewLibrary({
     }
   }
 
+  const voiceIdForRequest = ttsProvider === "elevenlabs" ? selectedVoiceId : "";
+
   async function playAudio(playbackId: string, sourceReviewId: string, cardId: string, variant: "normal" | "slow", fallbackText: string, speed: 1 | 0.75) {
     cancelPlayback();
     const sequence = playbackSequenceRef.current;
-    const cacheKey = JSON.stringify([sourceReviewId, cardId, variant, speed]);
+    const cacheKey = JSON.stringify([sourceReviewId, cardId, variant, speed, ttsProvider, voiceIdForRequest]);
     setPlaying(playbackId);
     setAudioNotice("");
 
@@ -619,7 +656,7 @@ export function ReviewLibrary({
       if (!mountedRef.current || fallbackStarted || sequence !== playbackSequenceRef.current) return;
       fallbackStarted = true;
       audioRef.current = null;
-      setAudioNotice("Fish Audio 本次未能生成语音，已切换到浏览器英语语音。请在设置中检查密钥或额度。");
+      setAudioNotice("本次未能生成语音，已切换到浏览器英语语音。请在设置中检查密钥或额度。");
       speak(fallbackText, speed, finish);
     };
 
@@ -629,7 +666,7 @@ export function ReviewLibrary({
         const response = await fetch("/api/tts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reviewId: sourceReviewId, cardId, variant, speed, provider: ttsProvider }),
+          body: JSON.stringify({ reviewId: sourceReviewId, cardId, variant, speed, provider: ttsProvider, voiceId: voiceIdForRequest }),
         });
         if (!response.ok) throw new Error("TTS unavailable");
         const audioBlob = await response.blob();
@@ -645,6 +682,60 @@ export function ReviewLibrary({
 
       const audio = new Audio(objectUrl);
       audio.playbackRate = speed;
+      audioRef.current = audio;
+      audio.onended = finish;
+      audio.onerror = fallbackToBrowser;
+      await audio.play();
+    } catch {
+      fallbackToBrowser();
+    }
+  }
+
+  // Speak arbitrary on-page text (e.g. an example sentence) with the learner's
+  // configured provider + selected voice, caching each clip and falling back to
+  // the browser voice so a play tap is never silent.
+  async function playText(playbackId: string, text: string) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    cancelPlayback();
+    const sequence = playbackSequenceRef.current;
+    const cacheKey = JSON.stringify(["speak", ttsProvider, voiceIdForRequest, trimmed]);
+    setPlaying(playbackId);
+    setAudioNotice("");
+
+    let fallbackStarted = false;
+    const finish = () => {
+      if (mountedRef.current && sequence === playbackSequenceRef.current) setPlaying("");
+    };
+    const fallbackToBrowser = () => {
+      if (!mountedRef.current || fallbackStarted || sequence !== playbackSequenceRef.current) return;
+      fallbackStarted = true;
+      audioRef.current = null;
+      setAudioNotice("本次未能生成语音，已切换到浏览器英语语音。请在设置中检查密钥或额度。");
+      speak(trimmed, 1, finish);
+    };
+
+    try {
+      let objectUrl = objectUrlsRef.current.get(cacheKey);
+      if (!objectUrl) {
+        const response = await fetch("/api/tts/speak", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: trimmed, provider: ttsProvider, voiceId: voiceIdForRequest }),
+        });
+        if (!response.ok) throw new Error("TTS unavailable");
+        const audioBlob = await response.blob();
+        if (!audioBlob.size) throw new Error("Empty TTS response");
+        objectUrl = URL.createObjectURL(audioBlob);
+        if (!mountedRef.current) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        objectUrlsRef.current.set(cacheKey, objectUrl);
+      }
+      if (sequence !== playbackSequenceRef.current) return;
+
+      const audio = new Audio(objectUrl);
       audioRef.current = audio;
       audio.onended = finish;
       audio.onerror = fallbackToBrowser;
@@ -671,7 +762,14 @@ export function ReviewLibrary({
         <button type="button" role="tab" aria-selected={activeTab === "audio"} onClick={() => setActiveTab("audio")} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-extrabold transition ${activeTab === "audio" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078] hover:text-[#41514b]"}`}><Headphones size={17} />听力跟读</button>
       </div>
 
-      {activeTab === "conversation" ? <><ConversationImport /><LatestConversationReview items={library.latestConversationItems} reviewDate={library.latestConversationDate} /></> : review ? <>
+      {ttsProvider === "elevenlabs" && elevenLabsVoices.length > 1 && <label className="mt-4 flex flex-wrap items-center gap-2 text-sm font-bold text-[#596861]">
+        <SpeakerHigh size={16} className="text-[#2f755f]" />朗读声音
+        <select value={selectedVoiceId} onChange={(event) => chooseVoice(event.target.value)} className="rounded-lg border border-[#dce4dc] bg-white px-3 py-2 text-sm">
+          {elevenLabsVoices.map((voice) => <option key={voice.voiceId} value={voice.voiceId}>{voice.name}</option>)}
+        </select>
+      </label>}
+
+      {activeTab === "conversation" ? <><ConversationImport /><LatestConversationReview items={library.latestConversationItems} reviewDate={library.latestConversationDate} onPlay={playText} playingId={playing} /></> : review ? <>
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#e3e9e3] pb-6">
           <div>
             <p className="text-xs font-extrabold tracking-[0.14em] text-[#2f755f]">{review.date} · {review.level} · {review.duration} 分钟</p>
@@ -686,7 +784,7 @@ export function ReviewLibrary({
         </div>
 
         <div className="mt-8">{activeTab === "history" ? (
-          review.cards.length ? <ReviewCards cards={review.cards} states={cardStates} onReveal={revealCard} onSubmit={submitAttempt} sessionAnsweredItemIds={sessionAnsweredItemIds} /> : <MarkdownReview markdown={review.markdown} />
+          review.cards.length ? <ReviewCards cards={review.cards} states={cardStates} onReveal={revealCard} onSubmit={submitAttempt} sessionAnsweredItemIds={sessionAnsweredItemIds} onPlay={playText} playingId={playing} /> : <MarkdownReview markdown={review.markdown} />
         ) : (
           <div className="space-y-4">
             <div className="rounded-xl bg-[#edf5ef] p-4 text-sm leading-6 text-[#416454]">

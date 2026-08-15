@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     const status = await saveElevenLabsConfiguration(
       user.id,
       apiKey as string | undefined,
-      { voiceId: input.voiceId, modelId: input.modelId },
+      { voiceId: input.voiceId, modelId: input.modelId, voices: input.voices },
     );
     return Response.json(status, {
       headers: { "cache-control": "no-store" },

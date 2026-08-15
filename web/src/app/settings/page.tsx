@@ -36,7 +36,11 @@ export default async function SettingsPage() {
   let elevenLabsStatus: ElevenLabsStatus = {
     configured: false,
     keySuffix: null,
-    metadata: { voiceId: "JBFqnCBsd6RMkjVDRZzb", modelId: "eleven_flash_v2_5" },
+    metadata: {
+      voiceId: "JBFqnCBsd6RMkjVDRZzb",
+      modelId: "eleven_flash_v2_5",
+      voices: [{ voiceId: "JBFqnCBsd6RMkjVDRZzb", name: "默认声音" }],
+    },
   };
   try {
     [fishAudioStatus, elevenLabsStatus] = await Promise.all([

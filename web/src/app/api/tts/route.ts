@@ -153,7 +153,8 @@ export async function POST(request: Request) {
     if (provider === "elevenlabs") {
       const credential = await getElevenLabsCredential(user.id);
       if (!credential) return Response.json({ message: "请先在设置中连接 ElevenLabs。" }, { status: 409 });
-      upstream = await synthesizeElevenLabsAudio(credential, text);
+      const requestedVoiceId = typeof input.voiceId === "string" ? input.voiceId.trim() : undefined;
+      upstream = await synthesizeElevenLabsAudio(credential, text, requestedVoiceId);
     } else {
       const credential = await getFishAudioCredential(user.id);
       if (!credential) return Response.json({ message: "请先在设置中连接 Fish Audio。" }, { status: 409 });
