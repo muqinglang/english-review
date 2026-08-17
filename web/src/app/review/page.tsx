@@ -126,35 +126,27 @@ export default async function ReviewPage() {
     rich: conversationDiagnostics.filter((item) => item.scenarioCount >= 3).length,
     ungraded: conversationDiagnostics.filter((item) => item.attempts === 0).length,
   });
-  // Show the latest synced batch so it can actually be reviewed. We do NOT
+  // Group every synced conversation batch by its practice session so the review
+  // page can offer a per-date picker (not only the newest batch). We do NOT
   // require the rich {meaning, 3 scenarios} shape here: if ChatGPT only produced
   // plain-text examples, the card still renders (plain fallback) instead of the
-  // whole batch silently disappearing. Only already-self-graded items are hidden
-  // (they have moved on to the SRS "旧题复习" queue).
-  const latestConversationRows = rawConversationRows
-    .filter((item) => !item.practice_attempts?.length);
-  const latestSessionBySpace = new Map<string, { id: string; practiceDate: string; createdAt: string }>();
-  for (const item of latestConversationRows) {
+  // whole batch silently disappearing. Already-self-graded items stay visible but
+  // are marked `graded` so the client shows them as done (they have moved on to
+  // the SRS "旧题复习" queue and cannot be re-graded here).
+  type ConversationSessionGroup = { id: string; date: string; createdAt: string; items: YesterdayConversationRow[] };
+  const conversationSessionsBySpace = new Map<string, Map<string, ConversationSessionGroup>>();
+  for (const item of rawConversationRows) {
     const session = sessionFor(item);
     if (!session) continue;
-    const current = latestSessionBySpace.get(session.knowledge_space_id);
-    if (!current || item.created_at > current.createdAt) {
-      latestSessionBySpace.set(session.knowledge_space_id, {
-        id: session.id,
-        practiceDate: session.practice_date,
-        createdAt: item.created_at,
-      });
+    const bySpace = conversationSessionsBySpace.get(session.knowledge_space_id) ?? new Map<string, ConversationSessionGroup>();
+    const existing = bySpace.get(session.id);
+    if (existing) {
+      existing.items.push(item);
+      if (item.created_at > existing.createdAt) existing.createdAt = item.created_at;
+    } else {
+      bySpace.set(session.id, { id: session.id, date: session.practice_date, createdAt: item.created_at, items: [item] });
     }
-  }
-  const latestConversationItemsBySpace = new Map<string, YesterdayConversationRow[]>();
-  for (const item of latestConversationRows) {
-    const session = sessionFor(item);
-    const spaceId = session?.knowledge_space_id;
-    const latestSession = spaceId ? latestSessionBySpace.get(spaceId) : null;
-    if (!spaceId || !latestSession || session.id !== latestSession.id) continue;
-    const items = latestConversationItemsBySpace.get(spaceId) ?? [];
-    items.push(item);
-    latestConversationItemsBySpace.set(spaceId, items);
+    conversationSessionsBySpace.set(session.knowledge_space_id, bySpace);
   }
 
   const reviewIds = (reviews ?? []).map((review) => review.id);
@@ -230,14 +222,20 @@ export default async function ReviewPage() {
   const libraries: ReviewLibraryData[] = (spaces ?? []).map((space) => ({
     id: space.id,
     name: space.display_name,
-    latestConversationDate: latestSessionBySpace.get(space.id)?.practiceDate ?? null,
-    latestConversationItems: (latestConversationItemsBySpace.get(space.id) ?? []).map((item) => ({
-      id: item.id,
-      normalizedKey: item.normalized_key,
-      cue: item.cue,
-      answer: item.answer,
-      example: item.example,
-    })),
+    conversationSessions: [...(conversationSessionsBySpace.get(space.id)?.values() ?? [])]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.date.localeCompare(left.date))
+      .map((session) => ({
+        id: session.id,
+        date: session.date,
+        items: session.items.map((item) => ({
+          id: item.id,
+          normalizedKey: item.normalized_key,
+          cue: item.cue,
+          answer: item.answer,
+          example: item.example,
+          graded: (item.practice_attempts?.length ?? 0) > 0,
+        })),
+      })),
     reviews: (reviews ?? [])
       .filter((review) => review.knowledge_space_id === space.id)
       .map((review) => {

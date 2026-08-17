@@ -36,6 +36,7 @@ export type YesterdayConversationItemData = {
   cue: string;
   answer: string;
   example: string | null;
+  graded: boolean;
 };
 
 type LifeScenarioExample = {
@@ -62,12 +63,17 @@ type Review = {
   cards: ReviewCardData[];
 };
 
+export type ConversationSessionData = {
+  id: string;
+  date: string;
+  items: YesterdayConversationItemData[];
+};
+
 export type ReviewLibraryData = {
   id: string;
   name: string;
   reviews: Review[];
-  latestConversationDate: string | null;
-  latestConversationItems: YesterdayConversationItemData[];
+  conversationSessions: ConversationSessionData[];
 };
 
 type CardState = {
@@ -246,7 +252,7 @@ function parseRichAnswer(card: Pick<ReviewCardData, "answer" | "example">): Rich
   }
 }
 
-function LatestConversationReview({ items, reviewDate, onPlay, playingId }: { items: YesterdayConversationItemData[]; reviewDate: string | null; onPlay: (id: string, text: string) => void; playingId: string }) {
+function LatestConversationReview({ items, reviewDate, isLatest, onPlay, playingId }: { items: YesterdayConversationItemData[]; reviewDate: string | null; isLatest: boolean; onPlay: (id: string, text: string) => void; playingId: string }) {
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<Record<string, AttemptResult>>({});
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
@@ -286,8 +292,8 @@ function LatestConversationReview({ items, reviewDate, onPlay, playingId }: { it
   return <section className="mt-5 rounded-2xl border border-[#c8dccc] bg-[#f5faf5] p-5 sm:p-6" aria-labelledby="latest-conversation-title">
     <div className="flex flex-wrap items-baseline justify-between gap-2">
       <div>
-        <p id="latest-conversation-title" className="text-lg font-black text-[#286247]">最新对话复习</p>
-        <p className="mt-1 text-sm leading-6 text-[#416454]">来自 {reviewDate} 最近一次成功同步的 {items.length} 个学习项。先在心里回答，再自评；结果会按遗忘曲线进入历史推荐。</p>
+        <p id="latest-conversation-title" className="text-lg font-black text-[#286247]">{isLatest ? "最新对话复习" : "对话复习"}</p>
+        <p className="mt-1 text-sm leading-6 text-[#416454]">来自 {reviewDate} 同步的 {items.length} 个学习项。先在心里回答，再自评；结果会按遗忘曲线进入历史推荐。</p>
       </div>
       <span className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-[#2f755f]">对话同步</span>
     </div>
@@ -325,7 +331,7 @@ function LatestConversationReview({ items, reviewDate, onPlay, playingId }: { it
               <p className="mt-2 text-sm leading-7 text-[#5f512d]">{richAnswer.usageTip}</p>
             </section>}
             <div className="border-t border-[#e3e9e3] bg-[#f1f8f3] p-4">
-              {results[item.id] ? <p className="font-extrabold text-[#286247]">已自评：{resultLabels[results[item.id]]}，已进入历史复习排期。</p> : <div className="flex flex-wrap gap-2">
+              {results[item.id] ? <p className="font-extrabold text-[#286247]">已自评：{resultLabels[results[item.id]]}，已进入历史复习排期。</p> : item.graded ? <p className="font-extrabold text-[#286247]">已自评，已进入历史复习排期。可在“旧题复习”继续。</p> : <div className="flex flex-wrap gap-2">
                 {(["incorrect", "partial", "correct"] as AttemptResult[]).map((result) => <button key={result} type="button" disabled={submitting[item.id]} onClick={() => submit(item, result)} className={`rounded-lg border px-3 py-2 text-xs font-extrabold transition disabled:opacity-50 ${result === "incorrect" ? "border-[#e2b7ad] bg-[#fff8f6] text-[#944c3f] hover:bg-[#fcebe7]" : result === "partial" ? "border-[#dec991] bg-[#fffaf0] text-[#80631c] hover:bg-[#fbf1d6]" : "border-[#a9cbb7] bg-[#f1faf4] text-[#286247] hover:bg-[#e2f3e8]"}`}>{submitting[item.id] ? "保存中…" : resultLabels[result]}</button>)}
               </div>}
               {errors[item.id] && <p className="mt-2 font-semibold text-[#9b3c2f]">{errors[item.id]}</p>}
@@ -463,6 +469,7 @@ export function ReviewLibrary({
 }) {
   const [libraryId, setLibraryId] = useState(libraries[0]?.id ?? "");
   const [reviewId, setReviewId] = useState(libraries[0]?.reviews[0]?.id ?? "");
+  const [conversationSessionId, setConversationSessionId] = useState(libraries[0]?.conversationSessions[0]?.id ?? "");
   const [activeTab, setActiveTab] = useState<"conversation" | "history" | "audio">("conversation");
   const [ttsProvider, setTtsProvider] = useState<"fish_audio" | "elevenlabs">("fish_audio");
   const [selectedVoiceId, setSelectedVoiceId] = useState(elevenLabsVoices[0]?.voiceId ?? "");
@@ -484,6 +491,10 @@ export function ReviewLibrary({
   const review = useMemo(
     () => library?.reviews.find((item) => item.id === reviewId) ?? library?.reviews[0],
     [library, reviewId],
+  );
+  const conversationSession = useMemo(
+    () => library?.conversationSessions.find((item) => item.id === conversationSessionId) ?? library?.conversationSessions[0],
+    [library, conversationSessionId],
   );
   useEffect(() => {
     const objectUrls = objectUrlsRef.current;
@@ -541,11 +552,17 @@ export function ReviewLibrary({
     resetReviewState();
     setLibraryId(id);
     setReviewId(next?.reviews[0]?.id ?? "");
+    setConversationSessionId(next?.conversationSessions[0]?.id ?? "");
   }
 
   function chooseReview(id: string) {
     resetReviewState();
     setReviewId(id);
+  }
+
+  function chooseConversationSession(id: string) {
+    cancelPlayback();
+    setConversationSessionId(id);
   }
 
   function revealCard(reviewItemId: string) {
@@ -769,7 +786,16 @@ export function ReviewLibrary({
         </select>
       </label>}
 
-      {activeTab === "conversation" ? <><ConversationImport /><LatestConversationReview items={library.latestConversationItems} reviewDate={library.latestConversationDate} onPlay={playText} playingId={playing} /></> : review ? <>
+      {activeTab === "conversation" ? <>
+        <ConversationImport />
+        {library.conversationSessions.length > 1 && <label className="mt-4 flex flex-wrap items-center gap-2 text-sm font-bold text-[#596861]">
+          <ChatCircleDots size={16} className="text-[#2f755f]" />选择对话日期
+          <select value={conversationSession?.id ?? ""} onChange={(event) => chooseConversationSession(event.target.value)} className="rounded-lg border border-[#dce4dc] bg-white px-3 py-2 text-sm">
+            {library.conversationSessions.map((item) => <option key={item.id} value={item.id}>{item.date}</option>)}
+          </select>
+        </label>}
+        <LatestConversationReview key={conversationSession?.id ?? "empty"} items={conversationSession?.items ?? []} reviewDate={conversationSession?.date ?? null} isLatest={library.conversationSessions[0]?.id === conversationSession?.id} onPlay={playText} playingId={playing} />
+      </> : review ? <>
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#e3e9e3] pb-6">
           <div>
             <p className="text-xs font-extrabold tracking-[0.14em] text-[#2f755f]">{review.date} · {review.level} · {review.duration} 分钟</p>
