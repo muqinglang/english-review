@@ -62,7 +62,7 @@ export default async function ReviewPage() {
   const user = await currentUser();
   if (!token || !user) redirect("/login");
 
-  const accountLabel = user.email?.split("@", 1)[0]?.trim() || "用户";
+  const accountLabel = user.email?.split("@", 1)[0]?.trim() || "User";
 
   const admin = createAdminClient();
   const [{ data: spaces, error: spacesError }, { data: reviews, error: reviewsError }, { data: conversationItems, error: conversationItemsError }] = await Promise.all([
@@ -132,7 +132,7 @@ export default async function ReviewPage() {
   // plain-text examples, the card still renders (plain fallback) instead of the
   // whole batch silently disappearing. Already-self-graded items stay visible but
   // are marked `graded` so the client shows them as done (they have moved on to
-  // the SRS "旧题复习" queue and cannot be re-graded here).
+  // the SRS "Review History" queue and cannot be re-graded here).
   type ConversationSessionGroup = { id: string; date: string; createdAt: string; items: YesterdayConversationRow[] };
   const conversationSessionsBySpace = new Map<string, Map<string, ConversationSessionGroup>>();
   for (const item of rawConversationRows) {
@@ -273,7 +273,7 @@ export default async function ReviewPage() {
         return {
           id: review.id,
           date: review.review_date,
-          title: typeof content.title === "string" ? content.title : "每日复习",
+          title: typeof content.title === "string" ? content.title : "Daily review",
           markdown: typeof content.markdown === "string" ? content.markdown : "",
           duration: typeof content.durationMinutes === "string" ? content.durationMinutes : "8–12",
           level: typeof content.level === "string" ? content.level : "B1",
@@ -290,23 +290,23 @@ export default async function ReviewPage() {
           <Link href="/" className="flex items-center gap-2 text-sm font-black tracking-tight"><span className="grid size-8 place-items-center rounded-xl bg-[#172223] text-white"><SquaresFour size={17} weight="fill" /></span>Chat Review</Link>
           <div className="flex items-center gap-2">
             <span className="hidden max-w-28 truncate text-xs font-bold text-[#4e8a70] sm:inline" title={user.email ?? undefined}>{accountLabel}</span>
-            <Link href="/capture" aria-label="添加内容" title="添加内容" className="grid size-9 place-items-center rounded-xl bg-[#172223] text-white transition hover:bg-[#2e403c] active:translate-y-px"><Plus size={18} weight="bold" /></Link>
-            <Link href="/settings" aria-label="设置" title="设置" className="grid size-9 place-items-center rounded-xl border border-[#cdd6cf] bg-white text-[#41514b] transition hover:border-[#8eaa9a] active:translate-y-px"><GearSix size={18} /></Link>
+            <Link href="/capture" aria-label="Add content" title="Add content" className="grid size-9 place-items-center rounded-xl bg-[#172223] text-white transition hover:bg-[#2e403c] active:translate-y-px"><Plus size={18} weight="bold" /></Link>
+            <Link href="/settings" aria-label="Settings" title="Settings" className="grid size-9 place-items-center rounded-xl border border-[#cdd6cf] bg-white text-[#41514b] transition hover:border-[#8eaa9a] active:translate-y-px"><GearSix size={18} /></Link>
           </div>
         </nav>
         <header className="grid gap-3 py-10 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:py-14">
           <div>
             <p className="text-xs font-bold tracking-[0.12em] text-[#4e8a70]">ENGLISH REVIEW</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">把不会的，变成会的。</h1>
+            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Turn what you can&apos;t into what you can.</h1>
           </div>
-          <p className="max-w-sm text-sm leading-6 text-[#596861]">先回忆，再核对。你的自评会决定下一次出现的时间。</p>
+          <p className="max-w-sm text-sm leading-6 text-[#596861]">Recall first, then check. Your self-rating decides when it shows up next.</p>
         </header>
         {libraries.length ? (
           <ReviewLibrary libraries={libraries} loadWarning={structuredLoadError} elevenLabsVoices={elevenLabsVoices} />
         ) : (
           <section className="mt-8 rounded-2xl border border-[#dce4dc] bg-white p-10 text-center">
-            <h2 className="text-xl font-black">还没有复习分类</h2>
-            <p className="mt-3 text-[#718078]">连接本机 Worker 并推送第一份每日复习后，内容会显示在这里。</p>
+            <h2 className="text-xl font-black">No review categories yet</h2>
+            <p className="mt-3 text-[#718078]">Connect your local Worker and push the first daily review — it&apos;ll show up here.</p>
           </section>
         )}
       </div>

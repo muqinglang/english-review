@@ -14,5 +14,5 @@ export function LogoutButton() {
     router.push("/login");
     router.refresh();
   }
-  return <button onClick={logout} disabled={busy} className="rounded-xl border border-red-200 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50">{busy ? "正在退出…" : "退出登录"}</button>;
+  return <button onClick={logout} disabled={busy} className="rounded-xl border border-red-200 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50">{busy ? "Signing out…" : "Sign out"}</button>;
 }

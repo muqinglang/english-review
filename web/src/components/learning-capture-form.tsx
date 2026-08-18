@@ -15,14 +15,14 @@ type CaptureResult = {
 };
 
 const ITEM_TYPES = [
-  ["vocabulary", "词汇"],
-  ["expression", "地道表达"],
-  ["error", "常见错误"],
-  ["pronunciation", "发音 / 听辨"],
-  ["fact", "事实"],
-  ["concept", "概念"],
-  ["decision", "决策"],
-  ["quote", "引用"],
+  ["vocabulary", "Vocabulary"],
+  ["expression", "Natural expression"],
+  ["error", "Common mistake"],
+  ["pronunciation", "Pronunciation / listening"],
+  ["fact", "Fact"],
+  ["concept", "Concept"],
+  ["decision", "Decision"],
+  ["quote", "Quote"],
 ] as const;
 
 function shanghaiToday() {
@@ -72,7 +72,7 @@ export function LearningCaptureForm({ spaces }: { spaces: CaptureKnowledgeSpace[
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(body.message ?? "无法保存学习内容。");
+        setError(body.message ?? "Could not save the learning item.");
         return;
       }
 
@@ -81,7 +81,7 @@ export function LearningCaptureForm({ spaces }: { spaces: CaptureKnowledgeSpace[
       setAnswer("");
       setExample("");
     } catch {
-      setError("无法连接保存服务，请检查网络后重试。");
+      setError("Could not reach the save service. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
@@ -90,8 +90,8 @@ export function LearningCaptureForm({ spaces }: { spaces: CaptureKnowledgeSpace[
   if (!spaces.length) {
     return (
       <section className="mt-8 rounded-2xl border border-[#dce4dc] bg-white p-8 text-center">
-        <h2 className="text-xl font-black">还没有知识库</h2>
-        <p className="mt-3 text-[#617068]">请先通过 Worker 建立一个知识库，再回来添加学习内容。</p>
+        <h2 className="text-xl font-black">No knowledge space yet</h2>
+        <p className="mt-3 text-[#617068]">Create a knowledge space through the Worker first, then come back to add content.</p>
       </section>
     );
   }
@@ -101,58 +101,58 @@ export function LearningCaptureForm({ spaces }: { spaces: CaptureKnowledgeSpace[
   return (
     <section className="mt-8 rounded-2xl border border-[#dce4dc] bg-white p-6 sm:p-8">
       <div className="rounded-xl bg-[#eff7f1] p-4 text-sm leading-6 text-[#315d4c]">
-        <strong>昨天聊天也可以补录：</strong>将“学习日期”设为昨天，English Tranning 里不会的内容会在今天进入复习。每次只保存一个可独立自评的知识点；若检索键已经存在，只更新内容和出现次数，不会重置原有排期。
+        <strong>You can backfill yesterday&apos;s chats too:</strong> set the &quot;Learned on&quot; date to yesterday, and anything you missed in English Tranning will come up for review today. Save one independently self-assessable item at a time; if the cue already exists, only its content and occurrence count are updated, and the existing schedule is not reset.
       </div>
 
       <form className="mt-7 grid gap-5" onSubmit={submit}>
         <div className="grid gap-5 sm:grid-cols-2">
           <label>
-            <span className="text-sm font-extrabold">知识库</span>
+            <span className="text-sm font-extrabold">Knowledge space</span>
             <select className={inputClass} value={knowledgeSpaceId} onChange={(event) => setKnowledgeSpaceId(event.target.value)}>
               {spaces.map((space) => <option key={space.id} value={space.id}>{space.name}</option>)}
             </select>
           </label>
           <label>
-            <span className="text-sm font-extrabold">学习日期（上海时区）</span>
+            <span className="text-sm font-extrabold">Learned on (Shanghai time)</span>
             <input className={inputClass} type="date" max={today} required value={learnedOn} onChange={(event) => setLearnedOn(event.target.value)} />
           </label>
         </div>
 
         <label>
-          <span className="text-sm font-extrabold">题目 / 提示</span>
-          <textarea className={`${inputClass} min-h-24 resize-y`} maxLength={500} required value={cue} onChange={(event) => setCue(event.target.value)} placeholder="例如：如何区分 insist on 和 persist in？" />
+          <span className="text-sm font-extrabold">Prompt / cue</span>
+          <textarea className={`${inputClass} min-h-24 resize-y`} maxLength={500} required value={cue} onChange={(event) => setCue(event.target.value)} placeholder="e.g. How do you tell insist on apart from persist in?" />
         </label>
 
         <label>
-          <span className="text-sm font-extrabold">答案</span>
-          <textarea className={`${inputClass} min-h-32 resize-y`} maxLength={5000} required value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="写下简明答案或自然表达" />
+          <span className="text-sm font-extrabold">Answer</span>
+          <textarea className={`${inputClass} min-h-32 resize-y`} maxLength={5000} required value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Write a concise answer or natural phrasing" />
         </label>
 
         <label>
-          <span className="text-sm font-extrabold">例句（可选）</span>
-          <textarea className={`${inputClass} min-h-24 resize-y`} maxLength={2000} value={example} onChange={(event) => setExample(event.target.value)} placeholder="例如：She persisted in asking for an explanation." />
+          <span className="text-sm font-extrabold">Example (optional)</span>
+          <textarea className={`${inputClass} min-h-24 resize-y`} maxLength={2000} value={example} onChange={(event) => setExample(event.target.value)} placeholder="e.g. She persisted in asking for an explanation." />
         </label>
 
         <div className="grid gap-5 sm:grid-cols-2">
           <label>
-            <span className="text-sm font-extrabold">类型</span>
+            <span className="text-sm font-extrabold">Type</span>
             <select className={inputClass} value={type} onChange={(event) => setType(event.target.value)}>
               {ITEM_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
           <label>
-            <span className="text-sm font-extrabold">优先级</span>
+            <span className="text-sm font-extrabold">Priority</span>
             <select className={inputClass} value={priority} onChange={(event) => setPriority(event.target.value)}>
-              <option value="high">高</option>
-              <option value="medium">中</option>
-              <option value="low">低</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
             </select>
           </label>
         </div>
 
         <div>
           <button type="submit" disabled={busy || !knowledgeSpaceId || !cue.trim() || !answer.trim()} className="rounded-xl bg-[#172223] px-6 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
-            {busy ? "正在保存…" : "保存并安排复习"}
+            {busy ? "Saving…" : "Save and schedule review"}
           </button>
         </div>
       </form>
@@ -160,8 +160,8 @@ export function LearningCaptureForm({ spaces }: { spaces: CaptureKnowledgeSpace[
       {result && (
         <p className="mt-5 rounded-xl bg-[#eff7f1] p-4 text-sm font-bold text-[#285e48]" role="status">
           {result.action === "created"
-            ? `已新增。将在 ${result.nextDue}${result.learnedOn === today ? "（明天）" : ""}首次复习。`
-            : `已更新已有条目（累计出现 ${result.occurrences} 次），原排期保持为 ${result.nextDue}。`}
+            ? `Added. First review on ${result.nextDue}${result.learnedOn === today ? " (tomorrow)" : ""}.`
+            : `Updated an existing item (seen ${result.occurrences} times total); the original schedule stays at ${result.nextDue}.`}
         </p>
       )}
       {error && <p className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700" role="alert">{error}</p>}

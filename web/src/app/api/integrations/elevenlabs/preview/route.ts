@@ -10,9 +10,9 @@ function upstreamMessage(body: string) {
   try {
     const parsed = JSON.parse(body) as { detail?: { message?: unknown }; message?: unknown };
     const detail = parsed.detail?.message ?? parsed.message;
-    return typeof detail === "string" ? detail : "ElevenLabs 未能生成试听语音。";
+    return typeof detail === "string" ? detail : "ElevenLabs could not generate the preview audio.";
   } catch {
-    return "ElevenLabs 未能生成试听语音。";
+    return "ElevenLabs could not generate the preview audio.";
   }
 }
 
@@ -21,7 +21,7 @@ function upstreamMessage(body: string) {
 // non-silent answer instead of the review page's quiet browser fallback.
 export async function POST(request: Request) {
   const user = await currentUser();
-  if (!user) return Response.json({ message: "请先登录。" }, { status: 401 });
+  if (!user) return Response.json({ message: "Please sign in first." }, { status: 401 });
 
   const body: unknown = await request.json().catch(() => null);
   const requested =
@@ -30,17 +30,17 @@ export async function POST(request: Request) {
       : undefined;
   const voiceId = typeof requested === "string" ? requested.trim() : "";
   if (!VOICE_ID_PATTERN.test(voiceId)) {
-    return Response.json({ message: "Voice ID 无效。" }, { status: 400 });
+    return Response.json({ message: "Invalid Voice ID." }, { status: 400 });
   }
 
   let credential: Awaited<ReturnType<typeof getElevenLabsCredential>>;
   try {
     credential = await getElevenLabsCredential(user.id);
   } catch {
-    return Response.json({ message: "无法读取 ElevenLabs 配置。" }, { status: 500 });
+    return Response.json({ message: "Unable to load ElevenLabs configuration." }, { status: 500 });
   }
   if (!credential) {
-    return Response.json({ message: "请先保存 ElevenLabs API Key 再试听。" }, { status: 409 });
+    return Response.json({ message: "Please save your ElevenLabs API key before previewing." }, { status: 409 });
   }
 
   // Allow previewing any well-formed voice ID (not just saved ones) so the user
@@ -58,15 +58,15 @@ export async function POST(request: Request) {
   try {
     upstream = await synthesizeElevenLabsAudio(testCredential, PREVIEW_TEXT, voiceId);
   } catch {
-    return Response.json({ message: "无法连接 ElevenLabs，请稍后再试。" }, { status: 502 });
+    return Response.json({ message: "Unable to connect to ElevenLabs. Please try again later." }, { status: 502 });
   }
 
   if (!upstream.ok || !upstream.body) {
     if (upstream.status === 401) {
-      return Response.json({ message: "ElevenLabs API Key 无效或无 Text to Speech 权限。" }, { status: 401 });
+      return Response.json({ message: "ElevenLabs API key is invalid or lacks Text to Speech permission." }, { status: 401 });
     }
     if (upstream.status === 429) {
-      return Response.json({ message: "ElevenLabs 额度不足或请求过于频繁。" }, { status: 429 });
+      return Response.json({ message: "ElevenLabs quota is insufficient or requests are too frequent." }, { status: 429 });
     }
     const message = upstreamMessage(await upstream.text().catch(() => ""));
     return Response.json({ message }, { status: upstream.status >= 400 ? upstream.status : 502 });

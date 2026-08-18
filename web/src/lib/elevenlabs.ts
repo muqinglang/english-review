@@ -52,7 +52,7 @@ function normalizeVoice(value: unknown, index: number): ElevenLabsVoice {
     throw new Error("Invalid ElevenLabs voice ID.");
   }
   const rawName = typeof record.name === "string" ? record.name.trim() : "";
-  const name = (rawName || `声音 ${index + 1}`).slice(0, 40);
+  const name = (rawName || `Voice ${index + 1}`).slice(0, 40);
   return { voiceId, name };
 }
 
@@ -79,7 +79,7 @@ export function normalizeElevenLabsMetadata(
       typeof metadata.voiceId === "string" && metadata.voiceId.trim()
         ? metadata.voiceId.trim()
         : DEFAULT_ELEVENLABS_VOICE_ID;
-    voices = [normalizeVoice({ voiceId: legacyVoiceId, name: "默认声音" }, 0)];
+    voices = [normalizeVoice({ voiceId: legacyVoiceId, name: "Default voice" }, 0)];
   }
 
   // Drop duplicate voice IDs while preserving order and the caller's chosen

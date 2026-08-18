@@ -27,9 +27,9 @@ function callbackError() {
 function failureMessage(error: unknown) {
   const detail = error instanceof Error ? error.message.toLowerCase() : "";
   if (detail.includes("otp_expired") || detail.includes("expired") || detail.includes("access_denied")) {
-    return "这封登录邮件已过期或已经使用。请返回登录页重新发送，并点击最新的一封邮件。";
+    return "This sign-in email has expired or was already used. Go back to the login page to resend it, then click the newest email.";
   }
-  return "登录验证暂时失败。请返回登录页重新尝试；若使用邮件登录，请点击最新的一封邮件。";
+  return "Sign-in verification failed for now. Go back to the login page and try again; if you're using email sign-in, click the newest email.";
 }
 
 async function saveSession(tokens: CallbackTokens) {
@@ -38,17 +38,17 @@ async function saveSession(tokens: CallbackTokens) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(tokens),
   });
-  if (!response.ok) throw new Error("无法保存登录会话。");
+  if (!response.ok) throw new Error("Couldn't save the sign-in session.");
 }
 
 export default function AuthCallbackPage() {
-  const [message, setMessage] = useState("正在完成登录…");
+  const [message, setMessage] = useState("Completing sign-in…");
   useEffect(() => {
     async function finish() {
       try {
         const redirectError = callbackError();
         if (redirectError) {
-          throw new Error(redirectError.code ?? redirectError.description ?? "登录链接无效。");
+          throw new Error(redirectError.code ?? redirectError.description ?? "Invalid sign-in link.");
         }
 
         // Server-generated email links use an implicit callback and return the
@@ -62,7 +62,7 @@ export default function AuthCallbackPage() {
           // exchangeCodeForSession() here a second time consumes the same code
           // twice and makes otherwise valid Google logins fail.
           const { data, error } = await createBrowserSupabaseClient().auth.getSession();
-          if (error || !data.session) throw error ?? new Error("没有获得有效登录会话。");
+          if (error || !data.session) throw error ?? new Error("No valid sign-in session was obtained.");
           await saveSession({
             accessToken: data.session.access_token,
             refreshToken: data.session.refresh_token,
@@ -78,5 +78,5 @@ export default function AuthCallbackPage() {
     }
     finish();
   }, []);
-  return <main className="flex min-h-screen items-center justify-center bg-[#f7f7f2] px-5 text-[#172223]"><section className="rounded-xl bg-white p-6 text-center shadow-lg"><p className="font-bold">{message}</p>{message !== "正在完成登录…" && <Link href="/login" className="mt-5 inline-block rounded-lg bg-[#172223] px-4 py-2 text-sm font-bold text-white">返回登录页</Link>}</section></main>;
+  return <main className="flex min-h-screen items-center justify-center bg-[#f7f7f2] px-5 text-[#172223]"><section className="rounded-xl bg-white p-6 text-center shadow-lg"><p className="font-bold">{message}</p>{message !== "Completing sign-in…" && <Link href="/login" className="mt-5 inline-block rounded-lg bg-[#172223] px-4 py-2 text-sm font-bold text-white">Back to login</Link>}</section></main>;
 }

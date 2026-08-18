@@ -36,7 +36,7 @@ function reviewRedirect(request: NextRequest) {
 
 function unauthenticated(request: NextRequest) {
   const response = isApiRequest(request)
-    ? NextResponse.json({ message: "请先登录。" }, { status: 401 })
+    ? NextResponse.json({ message: "Please sign in first." }, { status: 401 })
     : NextResponse.redirect(new URL("/login", request.url));
   clearAllSessionCookies(request, response);
   return response;
@@ -45,11 +45,11 @@ function unauthenticated(request: NextRequest) {
 function temporarilyUnavailable(request: NextRequest) {
   if (isApiRequest(request)) {
     return NextResponse.json(
-      { message: "登录状态暂时无法验证，请稍后重试。" },
+      { message: "Sign-in status can't be verified right now; please try again later." },
       { status: 503, headers: { "Cache-Control": "private, no-store, max-age=0" } },
     );
   }
-  return new NextResponse("登录状态暂时无法验证，请稍后刷新页面。", {
+  return new NextResponse("Sign-in status can't be verified right now; please refresh the page later.", {
     status: 503,
     headers: {
       "Content-Type": "text/plain; charset=utf-8",

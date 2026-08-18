@@ -1,9 +1,9 @@
 import Link from "next/link";
 
 const steps = [
-  ["01", "继续在 ChatGPT 聊天", "英语、投资或其他主题，都保留你原本顺滑的聊天体验。"],
-  ["02", "Worker 安全推送", "本机 Worker 整理有价值的聊天片段，再通过 API 推送到远程知识库。"],
-  ["03", "随时登录回顾", "按知识库复习关键结论、错题、表达和声音卡片。"],
+  ["01", "Keep chatting in ChatGPT", "English, investing, or any topic—keep the smooth chat experience you already love."],
+  ["02", "Worker pushes securely", "Your local Worker curates valuable chat snippets, then pushes them to your remote knowledge base via API."],
+  ["03", "Sign in to review anytime", "Review key takeaways, missed questions, expressions, and voice cards by knowledge space."],
 ];
 
 export default function Home() {
@@ -18,18 +18,18 @@ export default function Home() {
         <div>
           <p className="mb-4 text-sm font-bold tracking-[0.18em] text-[#4e8a70]">YOUR CHAT-BASED KNOWLEDGE BASE</p>
           <h1 className="max-w-[720px] text-[clamp(2.7rem,5vw,5.1rem)] font-black leading-[1.06] tracking-[-0.055em] text-[#172223]">Turn conversations<br /><span className="text-[#315547]">into knowledge.</span></h1>
-          <p className="mt-5 text-base font-semibold text-[#4e8a70]">把每次聊天，变成随时可回顾的知识。</p>
-          <p className="mt-5 max-w-xl text-[1.05rem] leading-8 text-[#53645d]">你照常使用 ChatGPT。本机 Worker 把值得保留的英语、投资或其他主题内容，安全推送到你的线上知识库。</p>
+          <p className="mt-5 text-base font-semibold text-[#4e8a70]">Turn every chat into knowledge you can review anytime.</p>
+          <p className="mt-5 max-w-xl text-[1.05rem] leading-8 text-[#53645d]">Use ChatGPT as usual. Your local Worker securely pushes worthwhile English, investing, or other content to your online knowledge base.</p>
           <div className="mt-9 flex flex-wrap gap-3">
-            <Link href="/login" className="rounded-full bg-[#172223] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#315547]">登录后开始复习</Link>
-            <span className="rounded-full border border-[#d5ddd7] bg-white px-5 py-3 text-sm font-semibold text-[#52635c]">数据连接已就绪</span>
+            <Link href="/login" className="rounded-full bg-[#172223] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#315547]">Sign in to start reviewing</Link>
+            <span className="rounded-full border border-[#d5ddd7] bg-white px-5 py-3 text-sm font-semibold text-[#52635c]">Data connection ready</span>
           </div>
         </div>
 
         <aside className="rounded-[2rem] bg-[#172223] p-6 text-white shadow-2xl shadow-[#172223]/15 sm:p-8">
-          <div className="flex items-center justify-between text-sm text-[#b8d0c3]"><span>今日回顾</span><span>8–12 分钟</span></div>
-          <div className="mt-9 rounded-2xl bg-[#edf6ed] p-6 text-[#172223]"><p className="text-sm font-bold text-[#4e8a70]">ACTIVE RECALL</p><p className="mt-4 text-2xl font-black leading-snug">Why does diversification reduce portfolio risk?</p><div className="mt-7 flex gap-2"><span className="rounded-full bg-[#d7ebdc] px-3 py-1 text-xs font-bold">投资知识库</span><span className="rounded-full bg-[#d7ebdc] px-3 py-1 text-xs font-bold">英语知识库</span></div></div>
-          <p className="mt-6 text-sm leading-6 text-[#b8d0c3]">上线后，这里会按知识库显示到期回顾项和最后同步状态。</p>
+          <div className="flex items-center justify-between text-sm text-[#b8d0c3]"><span>Today&apos;s review</span><span>8–12 min</span></div>
+          <div className="mt-9 rounded-2xl bg-[#edf6ed] p-6 text-[#172223]"><p className="text-sm font-bold text-[#4e8a70]">ACTIVE RECALL</p><p className="mt-4 text-2xl font-black leading-snug">Why does diversification reduce portfolio risk?</p><div className="mt-7 flex gap-2"><span className="rounded-full bg-[#d7ebdc] px-3 py-1 text-xs font-bold">Investing</span><span className="rounded-full bg-[#d7ebdc] px-3 py-1 text-xs font-bold">English</span></div></div>
+          <p className="mt-6 text-sm leading-6 text-[#b8d0c3]">Once live, this shows due review items and last sync status by knowledge space.</p>
         </aside>
       </section>
 

@@ -55,7 +55,7 @@ export function ElevenLabsPanel({
       .filter((voice) => voice.voiceId);
     if (!cleaned.length) {
       setBusy(false);
-      setError("至少需要一个有效的 Voice ID。");
+      setError("At least one valid Voice ID is required.");
       return;
     }
     try {
@@ -70,7 +70,7 @@ export function ElevenLabsPanel({
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(body.message ?? "无法保存 ElevenLabs 配置。");
+        setError(body.message ?? "Could not save the ElevenLabs configuration.");
         return;
       }
       // Immediately discard the only client-side copy after it reaches the API.
@@ -79,9 +79,9 @@ export function ElevenLabsPanel({
       setVoices(body.metadata.voices);
       setModelId(body.metadata.modelId);
       setLoadError(false);
-      setNotice("ElevenLabs 凭据已保存。可用下方「试听」验证每个声音。");
+      setNotice("ElevenLabs credentials saved. Use Preview below to verify each voice.");
     } catch {
-      setError("无法连接设置服务，请检查网络后重试。");
+      setError("Could not reach the settings service. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
@@ -90,7 +90,7 @@ export function ElevenLabsPanel({
   async function preview(index: number) {
     const voiceId = voices[index]?.voiceId.trim();
     if (!voiceId) {
-      setError("请先填写 Voice ID 再试听。");
+      setError("Enter a Voice ID before previewing.");
       return;
     }
     setError("");
@@ -104,12 +104,12 @@ export function ElevenLabsPanel({
       });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        setError(body.message ?? "试听失败，请检查密钥与 Voice ID。");
+        setError(body.message ?? "Preview failed. Check your key and Voice ID.");
         return;
       }
       const blob = await response.blob();
       if (!blob.size) {
-        setError("试听返回了空音频，请稍后重试。");
+        setError("The preview returned empty audio. Please try again later.");
         return;
       }
       audioRef.current?.pause();
@@ -121,7 +121,7 @@ export function ElevenLabsPanel({
       audio.onended = () => setPreviewing((value) => (value === index ? null : value));
       await audio.play();
     } catch {
-      setError("无法播放试听音频，请稍后重试。");
+      setError("Could not play the preview audio. Please try again later.");
     } finally {
       setPreviewing((value) => (value === index ? null : value));
     }
@@ -131,9 +131,9 @@ export function ElevenLabsPanel({
     <section className="rounded-2xl border border-[#dce4dc] bg-white p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black">ElevenLabs 语音</h2>
+          <h2 className="text-lg font-black">ElevenLabs Voice</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#617068]">
-            使用 ElevenLabs 生成复习音频。API Key 只会发送到本站服务端，并以加密形式保存。
+            Generate review audio with ElevenLabs. Your API Key is sent only to this site&apos;s server and stored encrypted.
           </p>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-[#617068]">
             <a
@@ -142,9 +142,9 @@ export function ElevenLabsPanel({
               rel="noreferrer"
               className="font-bold text-[#2f755f] underline underline-offset-2"
             >
-              前往 ElevenLabs 获取 API Key
+              Get an API Key from ElevenLabs
             </a>
-            ，建议只开放 Text to Speech 权限，并设置额度上限。
+            . We recommend granting Text to Speech access only and setting a quota limit.
           </p>
         </div>
         <span
@@ -152,19 +152,19 @@ export function ElevenLabsPanel({
             status.configured ? "bg-[#e4f3e8] text-[#2f755f]" : "bg-[#eeeeea] text-[#788179]"
           }`}
         >
-          {status.configured ? "已保存凭据" : "未配置"}
+          {status.configured ? "Credentials saved" : "Not configured"}
         </span>
       </div>
 
       {status.configured && status.keySuffix && (
         <p className="mt-5 text-sm text-[#456457]">
-          已保存密钥：<code>••••{status.keySuffix}</code>
+          Saved key: <code>••••{status.keySuffix}</code>
         </p>
       )}
 
       {loadError && (
         <p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-800" role="alert">
-          暂时无法读取语音配置。数据库更新可能仍在部署中，你可以稍后刷新再试。
+          Voice configuration is temporarily unavailable. A database update may still be deploying; refresh and try again later.
         </p>
       )}
 
@@ -177,27 +177,27 @@ export function ElevenLabsPanel({
           autoComplete="off"
           spellCheck={false}
           className="mt-2 w-full rounded-xl border border-[#cfd9d2] px-4 py-3 outline-none focus:border-[#4e8a70]"
-          placeholder={status.configured ? "留空以保留现有密钥，粘贴可替换" : "粘贴 ElevenLabs API Key"}
+          placeholder={status.configured ? "Leave blank to keep the current key, or paste to replace it" : "Paste your ElevenLabs API Key"}
         />
       </label>
 
       <div className="mt-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-extrabold">声音列表（可保存多个，听力跟读时切换）</span>
-          <span className="text-xs text-[#819087]">最多 {MAX_VOICES} 个 · 第一个为默认</span>
+          <span className="text-sm font-extrabold">Voice list (save several and switch during Listening)</span>
+          <span className="text-xs text-[#819087]">Up to {MAX_VOICES} · the first is the default</span>
         </div>
         <div className="mt-3 space-y-3">
           {voices.map((voice, index) => (
             <div key={index} className="rounded-xl border border-[#e3e9e3] bg-[#fbfcfa] p-3">
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
                 <label>
-                  <span className="text-xs font-extrabold text-[#6b7b74]">名称{index === 0 ? "（默认）" : ""}</span>
+                  <span className="text-xs font-extrabold text-[#6b7b74]">Name{index === 0 ? " (default)" : ""}</span>
                   <input
                     value={voice.name}
                     onChange={(event) => updateVoice(index, { name: event.target.value })}
                     autoComplete="off"
                     spellCheck={false}
-                    placeholder={`声音 ${index + 1}`}
+                    placeholder={`Voice ${index + 1}`}
                     className="mt-1.5 w-full rounded-lg border border-[#cfd9d2] px-3 py-2 text-sm outline-none focus:border-[#4e8a70]"
                   />
                 </label>
@@ -208,7 +208,7 @@ export function ElevenLabsPanel({
                     onChange={(event) => updateVoice(index, { voiceId: event.target.value })}
                     autoComplete="off"
                     spellCheck={false}
-                    placeholder="例如 JBFqnCBsd6RMkjVDRZzb"
+                    placeholder="e.g. JBFqnCBsd6RMkjVDRZzb"
                     className="mt-1.5 w-full rounded-lg border border-[#cfd9d2] px-3 py-2 font-mono text-sm outline-none focus:border-[#4e8a70]"
                   />
                 </label>
@@ -220,7 +220,7 @@ export function ElevenLabsPanel({
                   disabled={busy || previewing !== null || !voice.voiceId.trim()}
                   className="rounded-lg border border-[#b9c9bf] bg-white px-3 py-2 text-xs font-extrabold text-[#315f4f] transition hover:bg-[#edf5ef] disabled:opacity-50"
                 >
-                  {previewing === index ? "试听中…" : "试听"}
+                  {previewing === index ? "Previewing…" : "Preview"}
                 </button>
                 {voices.length > 1 && (
                   <button
@@ -229,7 +229,7 @@ export function ElevenLabsPanel({
                     disabled={busy}
                     className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
                   >
-                    删除
+                    Remove
                   </button>
                 )}
               </div>
@@ -243,13 +243,13 @@ export function ElevenLabsPanel({
             disabled={busy}
             className="mt-3 rounded-lg border border-dashed border-[#b9c9bf] px-4 py-2 text-sm font-bold text-[#315f4f] transition hover:bg-[#edf5ef] disabled:opacity-50"
           >
-            + 添加声音
+            + Add voice
           </button>
         )}
       </div>
 
       <label className="mt-5 block sm:max-w-xs">
-        <span className="text-sm font-extrabold">模型</span>
+        <span className="text-sm font-extrabold">Model</span>
         <input
           value={modelId}
           onChange={(event) => setModelId(event.target.value)}
@@ -266,13 +266,13 @@ export function ElevenLabsPanel({
           disabled={busy || !modelId.trim() || !voices.some((voice) => voice.voiceId.trim()) || (!status.configured && !apiKey.trim())}
           className="rounded-xl bg-[#172223] px-5 py-3 font-bold text-white disabled:opacity-50"
         >
-          {busy ? "正在处理…" : "保存配置"}
+          {busy ? "Processing…" : "Save configuration"}
         </button>
         {status.configured && (
           <button
             type="button"
             onClick={async () => {
-              if (!window.confirm("确定删除已保存的 ElevenLabs API Key 吗？")) return;
+              if (!window.confirm("Delete the saved ElevenLabs API Key?")) return;
               setBusy(true);
               setError("");
               setNotice("");
@@ -280,7 +280,7 @@ export function ElevenLabsPanel({
                 const response = await fetch("/api/integrations/elevenlabs", { method: "DELETE" });
                 const body = await response.json().catch(() => ({}));
                 if (!response.ok) {
-                  setError(body.message ?? "无法删除 ElevenLabs 配置。");
+                  setError(body.message ?? "Could not delete the ElevenLabs configuration.");
                   return;
                 }
                 setApiKey("");
@@ -288,9 +288,9 @@ export function ElevenLabsPanel({
                 setVoices(body.metadata.voices);
                 setModelId(body.metadata.modelId);
                 setLoadError(false);
-                setNotice("ElevenLabs 凭据已删除。");
+                setNotice("ElevenLabs credentials deleted.");
               } catch {
-                setError("无法连接设置服务，请检查网络后重试。");
+                setError("Could not reach the settings service. Check your connection and try again.");
               } finally {
                 setBusy(false);
               }
@@ -298,7 +298,7 @@ export function ElevenLabsPanel({
             disabled={busy}
             className="rounded-xl border border-red-200 px-5 py-3 font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
           >
-            删除凭据
+            Delete credentials
           </button>
         )}
       </div>

@@ -3,12 +3,12 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Chat Review",
-  description: "把 ChatGPT 聊天沉淀成可持续的主动回忆复习。",
+  description: "Turn ChatGPT conversations into sustainable active-recall review.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

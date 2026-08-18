@@ -63,7 +63,7 @@ function stableCaptureKey(type: string, cue: string) {
 
 function parseInput(body: unknown): CaptureInput | { error: string } {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return { error: "学习内容格式无效。" };
+    return { error: "Invalid learning item format." };
   }
 
   const input = body as Record<string, unknown>;
@@ -81,21 +81,21 @@ function parseInput(body: unknown): CaptureInput | { error: string } {
       ? input.learnedOn
       : "";
   if (input.normalizedKey !== undefined) {
-    return { error: "检索键由系统自动生成，不能用于修改旧台账项目。" };
+    return { error: "The lookup key is generated automatically by the system and cannot be used to modify existing ledger items." };
   }
   const key = stableCaptureKey(type, cue);
 
-  if (!UUID_PATTERN.test(knowledgeSpaceId)) return { error: "请选择有效的知识库。" };
-  if (!cue || cue.length > 500) return { error: "题目必须为 1–500 个字符。" };
-  if (!answer || answer.length > 5000) return { error: "答案必须为 1–5000 个字符。" };
-  if (example.length > 2000) return { error: "例句不能超过 2000 个字符。" };
-  if (!ITEM_TYPES.has(type)) return { error: "学习类型无效。" };
-  if (!PRIORITIES.has(priority)) return { error: "优先级无效。" };
+  if (!UUID_PATTERN.test(knowledgeSpaceId)) return { error: "Please select a valid knowledge space." };
+  if (!cue || cue.length > 500) return { error: "The cue must be 1–500 characters." };
+  if (!answer || answer.length > 5000) return { error: "The answer must be 1–5000 characters." };
+  if (example.length > 2000) return { error: "The example cannot exceed 2000 characters." };
+  if (!ITEM_TYPES.has(type)) return { error: "Invalid learning type." };
+  if (!PRIORITIES.has(priority)) return { error: "Invalid priority." };
   if (!isCalendarDate(learnedOn) || learnedOn > shanghaiToday()) {
-    return { error: "学习日期必须是今天或过去的有效日期。" };
+    return { error: "The learned-on date must be today or a valid past date." };
   }
   if (key.length < 2 || key.length > 160 || /[\u0000-\u001f\u007f]/.test(key)) {
-    return { error: "稳定检索键必须为 2–160 个字符，且不能包含控制字符。" };
+    return { error: "The stable lookup key must be 2–160 characters and cannot contain control characters." };
   }
 
   return {
@@ -112,7 +112,7 @@ function parseInput(body: unknown): CaptureInput | { error: string } {
 
 export async function POST(request: Request) {
   const user = await currentUser();
-  if (!user) return Response.json({ message: "请先登录。" }, { status: 401 });
+  if (!user) return Response.json({ message: "Please sign in first." }, { status: 401 });
 
   const parsed = parseInput(await request.json().catch(() => null));
   if ("error" in parsed) {
@@ -125,7 +125,7 @@ export async function POST(request: Request) {
     .upsert({ id: user.id }, { onConflict: "id", ignoreDuplicates: true });
   if (profileError) {
     console.error("Learning capture profile initialization failed", profileError);
-    return Response.json({ message: "无法初始化用户资料。" }, { status: 500 });
+    return Response.json({ message: "Unable to initialize user profile." }, { status: 500 });
   }
 
   const { data: space, error: spaceError } = await admin
@@ -136,9 +136,9 @@ export async function POST(request: Request) {
     .maybeSingle();
   if (spaceError) {
     console.error("Learning capture knowledge-space lookup failed", spaceError);
-    return Response.json({ message: "无法验证知识库。" }, { status: 500 });
+    return Response.json({ message: "Unable to verify knowledge space." }, { status: 500 });
   }
-  if (!space) return Response.json({ message: "知识库不存在或不属于当前账号。" }, { status: 404 });
+  if (!space) return Response.json({ message: "Knowledge space not found or does not belong to the current account." }, { status: 404 });
 
   const { data, error } = await admin.rpc("capture_learning_item", {
     p_user_id: user.id,
@@ -155,21 +155,21 @@ export async function POST(request: Request) {
   if (error) {
     if (error.code === "23505") {
       return Response.json(
-        { message: "相同学习项已存在于另一个知识库；请切换知识库或填写不同的检索键。" },
+        { message: "This learning item already exists in another knowledge space; switch knowledge spaces or use a different lookup key." },
         { status: 409 },
       );
     }
     if (error.code === "22023") {
-      return Response.json({ message: "学习内容未通过校验。" }, { status: 400 });
+      return Response.json({ message: "The learning item failed validation." }, { status: 400 });
     }
     console.error("Learning capture RPC failed", error);
-    return Response.json({ message: "保存学习内容失败。" }, { status: 500 });
+    return Response.json({ message: "Failed to save the learning item." }, { status: 500 });
   }
 
   const row = Array.isArray(data) ? data[0] : null;
   if (!row || (row.capture_action !== "created" && row.capture_action !== "updated")) {
     console.error("Learning capture RPC returned an invalid result", data);
-    return Response.json({ message: "保存学习内容失败。" }, { status: 500 });
+    return Response.json({ message: "Failed to save the learning item." }, { status: 500 });
   }
 
   return Response.json({

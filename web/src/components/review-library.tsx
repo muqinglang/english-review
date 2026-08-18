@@ -104,24 +104,24 @@ type AttemptPayload = {
 };
 
 const resultLabels: Record<AttemptResult, string> = {
-  incorrect: "答错",
-  partial: "模糊",
-  correct: "答对",
+  incorrect: "Forgot",
+  partial: "Unsure",
+  correct: "Got it",
 };
 
 const statusLabels: Record<string, string> = {
-  learning: "学习中",
-  reviewing: "巩固中",
-  mastered: "已掌握",
-  pending_confirmation: "待确认",
+  learning: "Learning",
+  reviewing: "Reviewing",
+  mastered: "Mastered",
+  pending_confirmation: "Pending",
 };
 
 function ExamplePlayButton({ id, text, playingId, onPlay }: { id: string; text: string; playingId: string; onPlay: (id: string, text: string) => void }) {
   const active = playingId === id;
   return <button
     type="button"
-    aria-label={active ? "正在朗读" : "朗读例句"}
-    title="用设置的声音朗读"
+    aria-label={active ? "Playing" : "Play example"}
+    title="Read aloud with your chosen voice"
     onClick={() => onPlay(id, text)}
     className={`grid size-7 shrink-0 place-items-center rounded-lg border transition ${active ? "border-[#2f755f] bg-[#e2f3e8] text-[#286247]" : "border-[#c8d5cd] bg-white text-[#315f4f] hover:bg-[#edf5ef]"}`}
   >
@@ -182,9 +182,11 @@ function stageValue(value: unknown, fallback: number) {
   return fallback;
 }
 
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 function formatDueDate(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  return match ? `${match[1]}年${Number(match[2])}月${Number(match[3])}日` : value;
+  return match ? `${MONTH_NAMES[Number(match[2]) - 1]} ${Number(match[3])}, ${match[1]}` : value;
 }
 
 function cleanText(value: unknown) {
@@ -267,8 +269,8 @@ function LatestConversationReview({ items, reviewDate, isLatest, onPlay, playing
   );
   if (!items.length) {
     return <section className="mt-5 rounded-2xl border border-dashed border-[#c8dccc] bg-[#f8fbf8] p-5 sm:p-6" aria-labelledby="latest-conversation-title">
-      <p id="latest-conversation-title" className="text-lg font-black text-[#286247]">最新对话复习</p>
-      <p className="mt-2 text-sm leading-6 text-[#416454]">还没有成功同步的 ChatGPT 对话内容。不会用旧的每日复习包替代。</p>
+      <p id="latest-conversation-title" className="text-lg font-black text-[#286247]">Latest conversation review</p>
+      <p className="mt-2 text-sm leading-6 text-[#416454]">No ChatGPT conversation has synced yet. We won&apos;t fall back to an old daily review pack.</p>
     </section>;
   }
 
@@ -283,10 +285,10 @@ function LatestConversationReview({ items, reviewDate, isLatest, onPlay, playing
         body: JSON.stringify({ practiceItemId: item.id, requestId: crypto.randomUUID(), result, submittedText: "" }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok || payload.ok !== true) throw new Error(typeof payload.message === "string" ? payload.message : "无法保存自评。");
+      if (!response.ok || payload.ok !== true) throw new Error(typeof payload.message === "string" ? payload.message : "Couldn't save your rating.");
       setResults((current) => ({ ...current, [item.id]: result }));
     } catch (error) {
-      setErrors((current) => ({ ...current, [item.id]: error instanceof Error ? error.message : "无法保存自评。" }));
+      setErrors((current) => ({ ...current, [item.id]: error instanceof Error ? error.message : "Couldn't save your rating." }));
     } finally {
       setSubmitting((current) => ({ ...current, [item.id]: false }));
     }
@@ -295,44 +297,44 @@ function LatestConversationReview({ items, reviewDate, isLatest, onPlay, playing
   return <section className="mt-5 rounded-2xl border border-[#c8dccc] bg-[#f5faf5] p-5 sm:p-6" aria-labelledby="latest-conversation-title">
     <div className="flex flex-wrap items-baseline justify-between gap-2">
       <div>
-        <p id="latest-conversation-title" className="text-lg font-black text-[#286247]">{isLatest ? "最新对话复习" : "对话复习"}</p>
-        <p className="mt-1 text-sm leading-6 text-[#416454]">来自 {reviewDate} 同步的 {items.length} 个学习项。先在心里回答，再自评；结果会按遗忘曲线进入历史推荐。</p>
+        <p id="latest-conversation-title" className="text-lg font-black text-[#286247]">{isLatest ? "Latest conversation review" : "Conversation review"}</p>
+        <p className="mt-1 text-sm leading-6 text-[#416454]">{items.length} items synced from {reviewDate}. Answer in your head first, then rate yourself — results enter the spaced-repetition history.</p>
       </div>
-      <span className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-[#2f755f]">对话同步</span>
+      <span className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-[#2f755f]">Conversation sync</span>
     </div>
     <div className="mt-5 grid gap-3">
       {items.map((item, index) => {
         const richAnswer = richAnswers.get(item.id) ?? parseRichAnswer(item);
         const isRevealed = revealed[item.id] ?? false;
         return <article key={item.id} className="rounded-xl border border-[#dce4dc] bg-white p-4">
-          <p className="text-xs font-extrabold tracking-[0.1em] text-[#2f755f]">第 {index + 1} 项</p>
+          <p className="text-xs font-extrabold tracking-[0.1em] text-[#2f755f]">Item {index + 1}</p>
           <h3 className="mt-2 font-black leading-7 text-[#172223]">{item.cue}</h3>
-          {!isRevealed ? <button type="button" onClick={() => setRevealed((current) => ({ ...current, [item.id]: true }))} className="mt-3 rounded-lg border border-[#b9c9bf] bg-white px-3 py-2 text-sm font-extrabold text-[#315f4f] hover:bg-[#edf5ef]">查看答案</button> : <div className="mt-4 overflow-hidden rounded-xl border border-[#dce4dc]">
+          {!isRevealed ? <button type="button" onClick={() => setRevealed((current) => ({ ...current, [item.id]: true }))} className="mt-3 rounded-lg border border-[#b9c9bf] bg-white px-3 py-2 text-sm font-extrabold text-[#315f4f] hover:bg-[#edf5ef]">Show answer</button> : <div className="mt-4 overflow-hidden rounded-xl border border-[#dce4dc]">
             <section className="p-4">
-              <p className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">核心含义</p>
+              <p className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">Core meaning</p>
               <p className="mt-2 text-base font-bold leading-7 text-[#172223]">{richAnswer.meaning}</p>
             </section>
             {richAnswer.explanation && <section className="border-t border-[#e3e9e3] bg-[#fbfcfa] p-4">
-              <p className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">这样理解</p>
+              <p className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">How to think of it</p>
               <p className="mt-2 text-sm leading-7 text-[#41514b]">{richAnswer.explanation}</p>
             </section>}
             {richAnswer.examples.length > 0 && <section className="border-t border-[#e3e9e3] p-4">
-              <p className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">生活场景</p>
-              <p className="mt-1 text-xs leading-5 text-[#7c8b83]">先听音频盲听，听不出再点眼睛查看英文和翻译。</p>
+              <p className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">In real life</p>
+              <p className="mt-1 text-xs leading-5 text-[#7c8b83]">Listen first; if you can&apos;t catch it, tap the eye to reveal the English and translation.</p>
               <div className="mt-3 grid gap-3 lg:grid-cols-2">
                 {richAnswer.examples.map((example, exampleIndex) => {
                   const exampleKey = `${item.id}:${exampleIndex}`;
                   const exampleShown = revealedExamples[exampleKey] ?? false;
                   return <article key={`${example.english}-${exampleIndex}`} className="rounded-xl bg-[#f3f7f2] p-4">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-xs font-extrabold text-[#2f755f]">{example.scenario ?? `场景 ${exampleIndex + 1}`}</p>
+                      <p className="text-xs font-extrabold text-[#2f755f]">{example.scenario ?? `Scene ${exampleIndex + 1}`}</p>
                       <div className="flex items-center gap-1.5">
                         <ExamplePlayButton id={`conv:${item.id}:${exampleIndex}`} text={example.english} playingId={playingId} onPlay={onPlay} />
                         <button
                           type="button"
-                          aria-label={exampleShown ? "隐藏原文与翻译" : "查看原文与翻译"}
+                          aria-label={exampleShown ? "Hide text and translation" : "Show text and translation"}
                           aria-pressed={exampleShown}
-                          title={exampleShown ? "隐藏原文" : "先听，听不出再看原文"}
+                          title={exampleShown ? "Hide text" : "Listen first, reveal if needed"}
                           onClick={() => setRevealedExamples((current) => ({ ...current, [exampleKey]: !exampleShown }))}
                           className="grid size-7 shrink-0 place-items-center rounded-lg border border-[#c8d5cd] bg-white text-[#315f4f] transition hover:bg-[#edf5ef]"
                         >
@@ -343,18 +345,18 @@ function LatestConversationReview({ items, reviewDate, isLatest, onPlay, playing
                     {exampleShown ? <>
                       <p className="mt-2 text-sm font-semibold leading-6 text-[#172223]">{example.english}</p>
                       {example.chinese && <p className="mt-2 text-sm leading-6 text-[#596861]">{example.chinese}</p>}
-                    </> : <p className="mt-2 text-sm leading-6 text-[#98a69c]">原文已隐藏 · 先听音频，听不出再点右上角眼睛。</p>}
+                    </> : <p className="mt-2 text-sm leading-6 text-[#98a69c]">Text hidden · listen first, tap the eye at the top-right to reveal.</p>}
                   </article>;
                 })}
               </div>
             </section>}
             {richAnswer.usageTip && <section className="border-t border-[#e3e9e3] bg-[#fffaf0] p-4">
-              <p className="text-xs font-extrabold tracking-[0.12em] text-[#80631c]">使用提醒</p>
+              <p className="text-xs font-extrabold tracking-[0.12em] text-[#80631c]">Usage tip</p>
               <p className="mt-2 text-sm leading-7 text-[#5f512d]">{richAnswer.usageTip}</p>
             </section>}
             <div className="border-t border-[#e3e9e3] bg-[#f1f8f3] p-4">
-              {results[item.id] ? <p className="font-extrabold text-[#286247]">已自评：{resultLabels[results[item.id]]}，已进入历史复习排期。</p> : item.graded ? <p className="font-extrabold text-[#286247]">已自评，已进入历史复习排期。可在“旧题复习”继续。</p> : <div className="flex flex-wrap gap-2">
-                {(["incorrect", "partial", "correct"] as AttemptResult[]).map((result) => <button key={result} type="button" disabled={submitting[item.id]} onClick={() => submit(item, result)} className={`rounded-lg border px-3 py-2 text-xs font-extrabold transition disabled:opacity-50 ${result === "incorrect" ? "border-[#e2b7ad] bg-[#fff8f6] text-[#944c3f] hover:bg-[#fcebe7]" : result === "partial" ? "border-[#dec991] bg-[#fffaf0] text-[#80631c] hover:bg-[#fbf1d6]" : "border-[#a9cbb7] bg-[#f1faf4] text-[#286247] hover:bg-[#e2f3e8]"}`}>{submitting[item.id] ? "保存中…" : resultLabels[result]}</button>)}
+              {results[item.id] ? <p className="font-extrabold text-[#286247]">Rated: {resultLabels[results[item.id]]} — added to the review schedule.</p> : item.graded ? <p className="font-extrabold text-[#286247]">Rated — added to the review schedule. Continue in “Review History”.</p> : <div className="flex flex-wrap gap-2">
+                {(["incorrect", "partial", "correct"] as AttemptResult[]).map((result) => <button key={result} type="button" disabled={submitting[item.id]} onClick={() => submit(item, result)} className={`rounded-lg border px-3 py-2 text-xs font-extrabold transition disabled:opacity-50 ${result === "incorrect" ? "border-[#e2b7ad] bg-[#fff8f6] text-[#944c3f] hover:bg-[#fcebe7]" : result === "partial" ? "border-[#dec991] bg-[#fffaf0] text-[#80631c] hover:bg-[#fbf1d6]" : "border-[#a9cbb7] bg-[#f1faf4] text-[#286247] hover:bg-[#e2f3e8]"}`}>{submitting[item.id] ? "Saving…" : resultLabels[result]}</button>)}
               </div>}
               {errors[item.id] && <p className="mt-2 font-semibold text-[#9b3c2f]">{errors[item.id]}</p>}
             </div>
@@ -390,7 +392,7 @@ function ReviewCards({
   const [revealedExamples, setRevealedExamples] = useState<Record<string, boolean>>({});
   return <div className="space-y-4">
     <div className="rounded-xl bg-[#edf5ef] p-4 text-sm leading-6 text-[#416454]">
-      今天共 {cards.length} 题。先在心里说出答案，再点“查看答案”并如实自评；系统会据此安排下一次复习。
+      {cards.length} items today. Say the answer in your head, then tap “Show answer” and rate yourself honestly — that sets your next review.
     </div>
     {cards.map((card, index) => {
       const state = states[card.reviewItemId] ?? {};
@@ -404,7 +406,7 @@ function ReviewCards({
       const richAnswer = richAnswers.get(card.reviewItemId) ?? parseRichAnswer(card);
 
       return <article key={card.reviewItemId} aria-labelledby={titleId} aria-busy={state.submitting || undefined} className="rounded-2xl border border-[#dce4dc] bg-[#fcfdfb] p-5 sm:p-6">
-        <p className="text-xs font-extrabold tracking-[0.12em] text-[#2f755f]">第 {index + 1} 题 / 共 {cards.length} 题</p>
+        <p className="text-xs font-extrabold tracking-[0.12em] text-[#2f755f]">Item {index + 1} of {cards.length}</p>
         <h3 id={titleId} className="mt-3 text-lg font-black leading-8 text-[#172223]">{card.cue}</h3>
 
         {!state.revealed ? (
@@ -414,41 +416,41 @@ function ReviewCards({
             onClick={() => onReveal(card.reviewItemId)}
             className="mt-5 rounded-lg bg-[#172223] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#2d3c3c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f755f]"
           >
-            {lastRecorded ? "查看答案与复习状态" : "查看答案"}
+            {lastRecorded ? "Show answer & status" : "Show answer"}
           </button>
         ) : (
           <div className="mt-5 space-y-4">
             <div className="overflow-hidden rounded-xl border border-[#dce4dc] bg-white">
               <section className="p-4 sm:p-5" aria-labelledby={`${titleId}-meaning`}>
-                <p id={`${titleId}-meaning`} className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">核心含义</p>
+                <p id={`${titleId}-meaning`} className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">Core meaning</p>
                 <p className="mt-2 whitespace-pre-wrap text-base font-bold leading-7 text-[#172223]">{richAnswer.meaning}</p>
               </section>
 
               {richAnswer.explanation && <section className="border-t border-[#e3e9e3] bg-[#fbfcfa] p-4 sm:p-5" aria-labelledby={`${titleId}-explanation`}>
-                <p id={`${titleId}-explanation`} className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">这样理解</p>
+                <p id={`${titleId}-explanation`} className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">How to think of it</p>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[#41514b]">{richAnswer.explanation}</p>
               </section>}
 
               {richAnswer.examples.length > 0 && <section className="border-t border-[#e3e9e3] p-4 sm:p-5" aria-labelledby={`${titleId}-examples`}>
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p id={`${titleId}-examples`} className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">生活场景</p>
-                  <p className="text-xs font-semibold text-[#819087]">共 {richAnswer.examples.length} 个</p>
+                  <p id={`${titleId}-examples`} className="text-xs font-extrabold tracking-[0.12em] text-[#6b7b74]">In real life</p>
+                  <p className="text-xs font-semibold text-[#819087]">{richAnswer.examples.length} total</p>
                 </div>
-                <p className="mt-1 text-xs leading-5 text-[#7c8b83]">先听音频盲听，听不出再点眼睛查看英文和翻译。</p>
+                <p className="mt-1 text-xs leading-5 text-[#7c8b83]">Listen first; if you can&apos;t catch it, tap the eye to reveal the English and translation.</p>
                 <div className="mt-3 grid gap-3 lg:grid-cols-2">
                   {richAnswer.examples.map((example, exampleIndex) => {
                     const exampleKey = `${card.reviewItemId}:${exampleIndex}`;
                     const exampleShown = revealedExamples[exampleKey] ?? false;
                     return <article key={`${example.english}-${exampleIndex}`} className="rounded-xl bg-[#f3f7f2] p-4">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-xs font-extrabold text-[#2f755f]">{example.scenario ?? `场景 ${exampleIndex + 1}`}</p>
+                        <p className="text-xs font-extrabold text-[#2f755f]">{example.scenario ?? `Scene ${exampleIndex + 1}`}</p>
                         <div className="flex items-center gap-1.5">
                           <ExamplePlayButton id={`hist:${card.reviewItemId}:${exampleIndex}`} text={example.english} playingId={playingId} onPlay={onPlay} />
                           <button
                             type="button"
-                            aria-label={exampleShown ? "隐藏原文与翻译" : "查看原文与翻译"}
+                            aria-label={exampleShown ? "Hide text and translation" : "Show text and translation"}
                             aria-pressed={exampleShown}
-                            title={exampleShown ? "隐藏原文" : "先听，听不出再看原文"}
+                            title={exampleShown ? "Hide text" : "Listen first, reveal if needed"}
                             onClick={() => setRevealedExamples((current) => ({ ...current, [exampleKey]: !exampleShown }))}
                             className="grid size-7 shrink-0 place-items-center rounded-lg border border-[#c8d5cd] bg-white text-[#315f4f] transition hover:bg-[#edf5ef]"
                           >
@@ -459,32 +461,32 @@ function ReviewCards({
                       {exampleShown ? <>
                         <p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-[#172223]">{example.english}</p>
                         {example.chinese && <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-[#627169]">{example.chinese}</p>}
-                      </> : <p className="mt-2 text-sm leading-6 text-[#98a69c]">原文已隐藏 · 先听音频，听不出再点右上角眼睛。</p>}
+                      </> : <p className="mt-2 text-sm leading-6 text-[#98a69c]">Text hidden · listen first, tap the eye at the top-right to reveal.</p>}
                     </article>;
                   })}
                 </div>
               </section>}
 
               {richAnswer.usageTip && <section className="border-t border-[#e3e9e3] bg-[#fffaf0] p-4 sm:p-5" aria-labelledby={`${titleId}-usage-tip`}>
-                <p id={`${titleId}-usage-tip`} className="text-xs font-extrabold tracking-[0.12em] text-[#80631c]">使用提醒</p>
+                <p id={`${titleId}-usage-tip`} className="text-xs font-extrabold tracking-[0.12em] text-[#80631c]">Usage tip</p>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[#5f512d]">{richAnswer.usageTip}</p>
               </section>}
             </div>
 
             {lastRecorded && (
               <div role="status" className="rounded-xl bg-[#edf5ef] p-4 text-sm leading-6 text-[#315f4f]">
-                <p className="font-extrabold">上次自评：{resultLabels[lastRecorded]}</p>
-                <p className="mt-1">下次复习：{formatDueDate(nextDue)} · 阶段 {stage} · {statusLabels[status] ?? status}</p>
+                <p className="font-extrabold">Last rating: {resultLabels[lastRecorded]}</p>
+                <p className="mt-1">Next review: {formatDueDate(nextDue)} · Stage {stage} · {statusLabels[status] ?? status}</p>
               </div>
             )}
             <fieldset disabled={state.submitting}>
-              <legend className="text-sm font-extrabold text-[#41514b]">{lastRecorded ? "今天再评一次（昨天答对不代表今天记得，可随时更新）" : "这次回忆得怎么样？"}</legend>
+              <legend className="text-sm font-extrabold text-[#41514b]">{lastRecorded ? "Rate again today (yesterday's “Got it” doesn't mean you remember today — update anytime)" : "How well did you recall it?"}</legend>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" onClick={() => onSubmit(card, "incorrect")} className="rounded-lg border border-[#e2b7ad] bg-[#fff8f6] px-4 py-2.5 text-sm font-bold text-[#944c3f] transition hover:bg-[#fcebe7] disabled:cursor-wait disabled:opacity-55">答错 · 明天再来</button>
-                <button type="button" onClick={() => onSubmit(card, "partial")} className="rounded-lg border border-[#dec991] bg-[#fffaf0] px-4 py-2.5 text-sm font-bold text-[#80631c] transition hover:bg-[#fbf1d6] disabled:cursor-wait disabled:opacity-55">模糊 · 稍后巩固</button>
-                <button type="button" onClick={() => onSubmit(card, "correct")} className="rounded-lg border border-[#a9cbb7] bg-[#f1faf4] px-4 py-2.5 text-sm font-bold text-[#286247] transition hover:bg-[#e2f3e8] disabled:cursor-wait disabled:opacity-55">答对 · 延长间隔</button>
+                <button type="button" onClick={() => onSubmit(card, "incorrect")} className="rounded-lg border border-[#e2b7ad] bg-[#fff8f6] px-4 py-2.5 text-sm font-bold text-[#944c3f] transition hover:bg-[#fcebe7] disabled:cursor-wait disabled:opacity-55">Forgot · try tomorrow</button>
+                <button type="button" onClick={() => onSubmit(card, "partial")} className="rounded-lg border border-[#dec991] bg-[#fffaf0] px-4 py-2.5 text-sm font-bold text-[#80631c] transition hover:bg-[#fbf1d6] disabled:cursor-wait disabled:opacity-55">Unsure · review soon</button>
+                <button type="button" onClick={() => onSubmit(card, "correct")} className="rounded-lg border border-[#a9cbb7] bg-[#f1faf4] px-4 py-2.5 text-sm font-bold text-[#286247] transition hover:bg-[#e2f3e8] disabled:cursor-wait disabled:opacity-55">Got it · longer interval</button>
               </div>
-              {state.submitting && <p aria-live="polite" className="mt-3 text-sm font-bold text-[#4e8a70]">正在保存评分…</p>}
+              {state.submitting && <p aria-live="polite" className="mt-3 text-sm font-bold text-[#4e8a70]">Saving your rating…</p>}
             </fieldset>
             {state.error && <p role="alert" className="rounded-lg bg-[#fff1ee] px-3 py-2 text-sm font-bold text-[#944c3f]">{state.error}</p>}
           </div>
@@ -635,7 +637,7 @@ export function ReviewLibrary({
       });
       const payload = await response.json().catch(() => null) as AttemptPayload | null;
       if (!response.ok || payload?.ok === false) {
-        throw new Error(payload?.message ?? "评分保存失败，请稍后重试。");
+        throw new Error(payload?.message ?? "Couldn't save your rating. Please try again.");
       }
       if (!mountedRef.current) return;
 
@@ -671,7 +673,7 @@ export function ReviewLibrary({
           ...current[card.reviewItemId],
           revealed: true,
           submitting: false,
-          error: error instanceof Error ? error.message : "评分保存失败，请稍后重试。",
+          error: error instanceof Error ? error.message : "Couldn't save your rating. Please try again.",
         },
       }));
     } finally {
@@ -696,7 +698,7 @@ export function ReviewLibrary({
       if (!mountedRef.current || fallbackStarted || sequence !== playbackSequenceRef.current) return;
       fallbackStarted = true;
       audioRef.current = null;
-      setAudioNotice("本次未能生成语音，已切换到浏览器英语语音。请在设置中检查密钥或额度。");
+      setAudioNotice("Couldn't generate audio this time; switched to the browser's English voice. Check your key or quota in Settings.");
       speak(fallbackText, speed, finish);
     };
 
@@ -751,7 +753,7 @@ export function ReviewLibrary({
       if (!mountedRef.current || fallbackStarted || sequence !== playbackSequenceRef.current) return;
       fallbackStarted = true;
       audioRef.current = null;
-      setAudioNotice("本次未能生成语音，已切换到浏览器英语语音。请在设置中检查密钥或额度。");
+      setAudioNotice("Couldn't generate audio this time; switched to the browser's English voice. Check your key or quota in Settings.");
       speak(trimmed, 1, finish);
     };
 
@@ -788,22 +790,22 @@ export function ReviewLibrary({
   if (!library) return null;
 
   return <>
-    {loadWarning && <div role="alert" className="mt-8 rounded-xl border border-[#dec991] bg-[#fffaf0] p-4 text-sm leading-6 text-[#80631c]">部分结构化复习数据暂时无法读取，旧内容仍可查看。请稍后刷新；若持续出现，请检查数据库迁移与服务日志。</div>}
+    {loadWarning && <div role="alert" className="mt-8 rounded-xl border border-[#dec991] bg-[#fffaf0] p-4 text-sm leading-6 text-[#80631c]">Some structured review data couldn&apos;t load right now; older content is still visible. Refresh in a moment, and if it persists, check the database migrations and server logs.</div>}
     <div className={`${loadWarning ? "mt-4" : "mt-8"} grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]`}>
     <aside className="h-fit rounded-2xl border border-[#dce4dc] bg-[#f8faf7] p-3">
-      <p className="px-3 pb-2 text-xs font-extrabold tracking-[0.14em] text-[#6b7b74]">现有分类</p>
-      <div className="space-y-2">{libraries.map((item) => <button key={item.id} type="button" onClick={() => chooseLibrary(item.id)} className={`w-full rounded-xl px-3 py-3 text-left text-sm font-extrabold transition ${item.id === library.id ? "bg-[#172223] text-white" : "text-[#41514b] hover:bg-white"}`}>{item.name}<span className={`mt-1 block text-xs font-medium ${item.id === library.id ? "text-white/60" : "text-[#819087]"}`}>{item.reviews.length ? `${item.reviews.length} 份复习` : "等待复习内容"}</span></button>)}</div>
+      <p className="px-3 pb-2 text-xs font-extrabold tracking-[0.14em] text-[#6b7b74]">Categories</p>
+      <div className="space-y-2">{libraries.map((item) => <button key={item.id} type="button" onClick={() => chooseLibrary(item.id)} className={`w-full rounded-xl px-3 py-3 text-left text-sm font-extrabold transition ${item.id === library.id ? "bg-[#172223] text-white" : "text-[#41514b] hover:bg-white"}`}>{item.name}<span className={`mt-1 block text-xs font-medium ${item.id === library.id ? "text-white/60" : "text-[#819087]"}`}>{item.reviews.length ? `${item.reviews.length} reviews` : "Waiting for content"}</span></button>)}</div>
     </aside>
 
     <section className="min-w-0 rounded-2xl border border-[#dce4dc] bg-white p-5 sm:p-8">
-      <div className="flex gap-1 rounded-xl bg-[#f3f6f2] p-1.5" role="tablist" aria-label="复习内容">
-        <button type="button" role="tab" aria-selected={activeTab === "conversation"} onClick={() => { cancelPlayback(); setActiveTab("conversation"); }} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-extrabold transition ${activeTab === "conversation" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078] hover:text-[#41514b]"}`}><ChatCircleDots size={17} />对话复习</button>
-        <button type="button" role="tab" aria-selected={activeTab === "history"} onClick={() => { cancelPlayback(); setActiveTab("history"); }} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-extrabold transition ${activeTab === "history" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078] hover:text-[#41514b]"}`}><Stack size={17} />旧题复习</button>
-        <button type="button" role="tab" aria-selected={activeTab === "audio"} onClick={() => setActiveTab("audio")} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-extrabold transition ${activeTab === "audio" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078] hover:text-[#41514b]"}`}><Headphones size={17} />听力跟读</button>
+      <div className="flex gap-1 rounded-xl bg-[#f3f6f2] p-1.5" role="tablist" aria-label="Review content">
+        <button type="button" role="tab" aria-selected={activeTab === "conversation"} onClick={() => { cancelPlayback(); setActiveTab("conversation"); }} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-extrabold transition ${activeTab === "conversation" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078] hover:text-[#41514b]"}`}><ChatCircleDots size={17} />Conversation</button>
+        <button type="button" role="tab" aria-selected={activeTab === "history"} onClick={() => { cancelPlayback(); setActiveTab("history"); }} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-extrabold transition ${activeTab === "history" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078] hover:text-[#41514b]"}`}><Stack size={17} />Review History</button>
+        <button type="button" role="tab" aria-selected={activeTab === "audio"} onClick={() => setActiveTab("audio")} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-extrabold transition ${activeTab === "audio" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078] hover:text-[#41514b]"}`}><Headphones size={17} />Listening</button>
       </div>
 
       {ttsProvider === "elevenlabs" && elevenLabsVoices.length > 1 && <label className="mt-4 flex flex-wrap items-center gap-2 text-sm font-bold text-[#596861]">
-        <SpeakerHigh size={16} className="text-[#2f755f]" />朗读声音
+        <SpeakerHigh size={16} className="text-[#2f755f]" />Voice
         <select value={selectedVoiceId} onChange={(event) => chooseVoice(event.target.value)} className="rounded-lg border border-[#dce4dc] bg-white px-3 py-2 text-sm">
           {elevenLabsVoices.map((voice) => <option key={voice.voiceId} value={voice.voiceId}>{voice.name}</option>)}
         </select>
@@ -812,7 +814,7 @@ export function ReviewLibrary({
       {activeTab === "conversation" ? <>
         <ConversationImport />
         {library.conversationSessions.length > 1 && <label className="mt-4 flex flex-wrap items-center gap-2 text-sm font-bold text-[#596861]">
-          <ChatCircleDots size={16} className="text-[#2f755f]" />选择对话日期
+          <ChatCircleDots size={16} className="text-[#2f755f]" />Pick a date
           <select value={conversationSession?.id ?? ""} onChange={(event) => chooseConversationSession(event.target.value)} className="rounded-lg border border-[#dce4dc] bg-white px-3 py-2 text-sm">
             {library.conversationSessions.map((item) => <option key={item.id} value={item.id}>{item.date}</option>)}
           </select>
@@ -821,11 +823,11 @@ export function ReviewLibrary({
       </> : review ? <>
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#e3e9e3] pb-6">
           <div>
-            <p className="text-xs font-extrabold tracking-[0.14em] text-[#2f755f]">{review.date} · {review.level} · {review.duration} 分钟</p>
+            <p className="text-xs font-extrabold tracking-[0.14em] text-[#2f755f]">{review.date} · {review.level} · {review.duration} min</p>
             <h2 className="mt-2 text-2xl font-black sm:text-3xl">{review.title}</h2>
           </div>
           {library.reviews.length > 1 && <label className="text-sm font-bold text-[#596861]">
-            <span className="sr-only">选择复习日期</span>
+            <span className="sr-only">Pick a review date</span>
             <select value={review.id} onChange={(event) => chooseReview(event.target.value)} className="rounded-lg border border-[#dce4dc] bg-white px-3 py-2 text-sm">
               {library.reviews.map((item) => <option key={item.id} value={item.id}>{item.date}</option>)}
             </select>
@@ -837,11 +839,11 @@ export function ReviewLibrary({
         ) : (
           <div className="space-y-4">
             <div className="rounded-xl bg-[#edf5ef] p-4 text-sm leading-6 text-[#416454]">
-              <p className="font-extrabold">先听 → 输入 → 点眼睛核对</p>
-              <p className="mt-1">先不要看英文，写下你听到的内容，再显示原文对照。草稿只保留在当前页面，不会提交评分。</p>
+              <p className="font-extrabold">Listen → type → tap the eye to check</p>
+              <p className="mt-1">Don&apos;t look at the English yet — write what you hear, then reveal the text to compare. Drafts stay on this page and aren&apos;t submitted.</p>
             </div>
             {audioNotice && <div role="status" className="rounded-xl bg-[#fffaf0] p-4 text-sm leading-6 text-[#80631c]">{audioNotice}</div>}
-            <span className="sr-only" aria-live="polite">{playing ? "正在播放音频" : "音频播放结束"}</span>
+            <span className="sr-only" aria-live="polite">{playing ? "Audio playing" : "Audio finished"}</span>
             {review.audioCards.map((card, index) => {
               const stateKey = JSON.stringify([review.id, card.id]);
               const normalPlaybackId = `${stateKey}:normal`;
@@ -856,24 +858,24 @@ export function ReviewLibrary({
                   <p className="text-xs font-extrabold text-[#2f755f]">{String(index + 1).padStart(2, "0")} · {card.prompt}</p>
                   <button
                     type="button"
-                    aria-label={transcriptVisible ? "隐藏英文原文" : "显示英文原文"}
+                    aria-label={transcriptVisible ? "Hide English text" : "Show English text"}
                     aria-expanded={transcriptVisible}
                     aria-controls={transcriptId}
-                    title={transcriptVisible ? "隐藏英文原文" : "显示英文原文并核对"}
+                    title={transcriptVisible ? "Hide English text" : "Show the English text to check"}
                     onClick={() => setVisibleAudioTranscripts((current) => ({ ...current, [stateKey]: !transcriptVisible }))}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-[#c8d5cd] bg-white px-3 py-2 text-xs font-extrabold text-[#315f4f] transition hover:bg-[#edf5ef] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f755f]"
                   >
                     {transcriptVisible ? <EyeSlash size={16} /> : <Eye size={16} />}
-                    {transcriptVisible ? "隐藏原文" : "显示原文"}
+                    {transcriptVisible ? "Hide text" : "Show text"}
                   </button>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <button type="button" aria-label="播放正常语速" title="正常语速" onClick={() => playAudio(normalPlaybackId, review.id, card.id, "normal", card.normal, 1)} className="grid size-10 place-items-center rounded-xl bg-[#172223] text-white transition hover:bg-[#2d3c3c] active:translate-y-px"><Play size={17} weight="fill" /></button>
-                  <button type="button" aria-label="播放慢速语音" title="慢速语音" onClick={() => playAudio(slowPlaybackId, review.id, card.id, "slow", card.slow || card.normal, 0.75)} className="flex h-10 items-center gap-1.5 rounded-xl border border-[#b9c9bf] px-3 text-xs font-bold text-[#315f4f] transition hover:bg-[#edf5ef] active:translate-y-px"><SpeakerHigh size={16} />0.75×</button>
+                  <button type="button" aria-label="Play at normal speed" title="Normal speed" onClick={() => playAudio(normalPlaybackId, review.id, card.id, "normal", card.normal, 1)} className="grid size-10 place-items-center rounded-xl bg-[#172223] text-white transition hover:bg-[#2d3c3c] active:translate-y-px"><Play size={17} weight="fill" /></button>
+                  <button type="button" aria-label="Play at slow speed" title="Slow speed" onClick={() => playAudio(slowPlaybackId, review.id, card.id, "slow", card.slow || card.normal, 0.75)} className="flex h-10 items-center gap-1.5 rounded-xl border border-[#b9c9bf] px-3 text-xs font-bold text-[#315f4f] transition hover:bg-[#edf5ef] active:translate-y-px"><SpeakerHigh size={16} />0.75×</button>
                 </div>
 
-                <label htmlFor={inputId} className="mt-5 block text-sm font-extrabold text-[#41514b]">写下你听到的英文</label>
+                <label htmlFor={inputId} className="mt-5 block text-sm font-extrabold text-[#41514b]">Write what you hear</label>
                 <textarea
                   id={inputId}
                   value={draft}
@@ -883,21 +885,21 @@ export function ReviewLibrary({
                   autoCorrect="off"
                   autoCapitalize="none"
                   spellCheck="false"
-                  placeholder="先凭听力写下来，再点右上角眼睛核对…"
+                  placeholder="Write it from listening first, then tap the eye at the top-right to check…"
                   className="mt-2 w-full resize-y rounded-xl border border-[#cfd9d2] bg-[#fbfcfa] px-3.5 py-3 text-sm leading-6 text-[#172223] outline-none transition placeholder:text-[#617068] focus:border-[#4e8a70] focus:ring-2 focus:ring-[#4e8a70]/15"
                 />
 
                 <div id={transcriptId} className={`mt-4 rounded-xl border px-4 py-3 ${transcriptVisible ? "border-[#b8d2c2] bg-[#f1f8f3]" : "border-dashed border-[#dce4dc] bg-[#fafbf9]"}`}>
                   {transcriptVisible ? <>
-                    <p className="text-xs font-extrabold tracking-[0.1em] text-[#2f755f]">英文原文</p>
+                    <p className="text-xs font-extrabold tracking-[0.1em] text-[#2f755f]">English text</p>
                     <p className="mt-2 text-base font-bold leading-7 text-[#172223]">{card.normal}</p>
-                  </> : <p className="text-sm leading-6 text-[#596861]">英文原文已隐藏。输入完成后，点右上角眼睛核对。</p>}
+                  </> : <p className="text-sm leading-6 text-[#596861]">English text hidden. When you&apos;re done, tap the eye at the top-right to check.</p>}
                 </div>
               </article>;
             })}
           </div>
         )}</div>
-      </> : <div className="py-16 text-center"><p className="text-lg font-black">这个分类还没有每日复习</p><p className="mt-2 text-sm text-[#718078]">Worker 推送下一份复习包后会显示在这里。</p></div>}
+      </> : <div className="py-16 text-center"><p className="text-lg font-black">No daily review for this category yet</p><p className="mt-2 text-sm text-[#718078]">It&apos;ll show up here once the Worker pushes the next review pack.</p></div>}
     </section>
     </div>
   </>;

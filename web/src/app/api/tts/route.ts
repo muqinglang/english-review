@@ -58,12 +58,12 @@ function audioCards(value: unknown): AudioCard[] | null {
 export async function POST(request: Request) {
   const user = await currentUser();
   if (!user) {
-    return Response.json({ message: "请先登录。" }, { status: 401 });
+    return Response.json({ message: "Please sign in first." }, { status: 401 });
   }
 
   const body: unknown = await request.json().catch(() => null);
   if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return Response.json({ message: "请求内容无效。" }, { status: 400 });
+    return Response.json({ message: "Invalid request." }, { status: 400 });
   }
 
   const input = body as Record<string, unknown>;
@@ -71,13 +71,13 @@ export async function POST(request: Request) {
   const provider: TtsProvider = input.provider === "elevenlabs" ? "elevenlabs" : "fish_audio";
   if (!isUuid(input.reviewId) || !cardId || cardId.length > 240) {
     return Response.json(
-      { message: "复习或音频卡片 ID 无效。" },
+      { message: "Invalid review or audio card ID." },
       { status: 400 },
     );
   }
   if (input.variant !== "normal" && input.variant !== "slow") {
     return Response.json(
-      { message: "音频版本必须是 normal 或 slow。" },
+      { message: "Audio variant must be normal or slow." },
       { status: 400 },
     );
   }
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     speed > MAX_SPEED
   ) {
     return Response.json(
-      { message: "语速必须在 0.7 到 1.2 之间。" },
+      { message: "Speed must be between 0.7 and 1.2." },
       { status: 400 },
     );
   }
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
 
   if (reviewError) {
     return Response.json(
-      { message: "无法读取复习音频。" },
+      { message: "Unable to load the review audio." },
       { status: 500 },
     );
   }
@@ -116,13 +116,13 @@ export async function POST(request: Request) {
   if (!card) {
     // Use one response for missing and other-user resources to avoid disclosing
     // whether a guessed review/card ID exists.
-    return Response.json({ message: "复习音频不存在。" }, { status: 404 });
+    return Response.json({ message: "Review audio not found." }, { status: 404 });
   }
 
   const text = input.variant === "slow" ? card.slow ?? card.normal : card.normal;
   if (!text.trim() || text.length > MAX_TEXT_LENGTH) {
     return Response.json(
-      { message: "这张音频卡片不适合语音合成。" },
+      { message: "This audio card is not suitable for speech synthesis." },
       { status: 422 },
     );
   }
@@ -137,13 +137,13 @@ export async function POST(request: Request) {
   );
   if (reservationError) {
     return Response.json(
-      { message: "无法检查今日语音额度。" },
+      { message: "Unable to check today's voice quota." },
       { status: 500 },
     );
   }
   if (reserved !== true) {
     return Response.json(
-      { message: "今天的语音生成额度已达上限，请明天再试。" },
+      { message: "You've reached today's voice generation quota. Please try again tomorrow." },
       { status: 429 },
     );
   }
@@ -152,17 +152,17 @@ export async function POST(request: Request) {
   try {
     if (provider === "elevenlabs") {
       const credential = await getElevenLabsCredential(user.id);
-      if (!credential) return Response.json({ message: "请先在设置中连接 ElevenLabs。" }, { status: 409 });
+      if (!credential) return Response.json({ message: "Please connect ElevenLabs in settings first." }, { status: 409 });
       const requestedVoiceId = typeof input.voiceId === "string" ? input.voiceId.trim() : undefined;
       upstream = await synthesizeElevenLabsAudio(credential, text, requestedVoiceId);
     } else {
       const credential = await getFishAudioCredential(user.id);
-      if (!credential) return Response.json({ message: "请先在设置中连接 Fish Audio。" }, { status: 409 });
+      if (!credential) return Response.json({ message: "Please connect Fish Audio in settings first." }, { status: 409 });
       upstream = await synthesizeFishAudio(credential, text);
     }
   } catch {
     return Response.json(
-      { message: "语音服务暂时无法连接，请稍后重试。" },
+      { message: "The voice service is temporarily unavailable. Please try again later." },
       { status: 502 },
     );
   }
@@ -170,12 +170,12 @@ export async function POST(request: Request) {
   if (!upstream.ok || !upstream.body) {
     if (upstream.status === 429) {
       return Response.json(
-        { message: `${provider === "elevenlabs" ? "ElevenLabs" : "Fish Audio"} 额度不足或请求过于频繁。` },
+        { message: `${provider === "elevenlabs" ? "ElevenLabs" : "Fish Audio"} quota is insufficient or requests are too frequent.` },
         { status: 429 },
       );
     }
     return Response.json(
-      { message: `${provider === "elevenlabs" ? "ElevenLabs" : "Fish Audio"} 未能生成语音，请检查配置或稍后重试。` },
+      { message: `${provider === "elevenlabs" ? "ElevenLabs" : "Fish Audio"} could not generate audio. Please check your configuration or try again later.` },
       { status: 502 },
     );
   }

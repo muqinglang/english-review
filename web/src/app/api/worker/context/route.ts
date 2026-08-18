@@ -7,11 +7,11 @@ const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 } as const;
 
 export async function GET(request: Request) {
   const token = bearerToken(request);
-  if (!token) return Response.json({ message: "缺少 Worker 令牌。" }, { status: 401 });
+  if (!token) return Response.json({ message: "Missing Worker token." }, { status: 401 });
 
   const requestedSpace = new URL(request.url).searchParams.get("space")?.trim() ?? "";
   if (!requestedSpace || requestedSpace.length > 80) {
-    return Response.json({ message: "space 必须是非空的知识库名称。" }, { status: 400 });
+    return Response.json({ message: "space must be a non-empty knowledge space name." }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -24,9 +24,9 @@ export async function GET(request: Request) {
 
   if (deviceError) {
     console.error("Worker authentication failed", deviceError);
-    return Response.json({ message: "无法验证 Worker 令牌。" }, { status: 500 });
+    return Response.json({ message: "Unable to verify Worker token." }, { status: 500 });
   }
-  if (!device) return Response.json({ message: "Worker 令牌无效或已撤销。" }, { status: 401 });
+  if (!device) return Response.json({ message: "Worker token is invalid or revoked." }, { status: 401 });
 
   // Read under the canonical owner so a token registered on a secondary account
   // still sees the shared dataset (mirrors the web session and the push route).
@@ -41,9 +41,9 @@ export async function GET(request: Request) {
 
   if (spaceError) {
     console.error("Worker knowledge-space lookup failed", spaceError);
-    return Response.json({ message: "无法读取知识库。" }, { status: 500 });
+    return Response.json({ message: "Unable to read knowledge space." }, { status: 500 });
   }
-  if (!space) return Response.json({ message: "知识库不存在。" }, { status: 404 });
+  if (!space) return Response.json({ message: "Knowledge space not found." }, { status: 404 });
 
   const { data, error } = await admin
     .from("learning_items")
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
 
   if (error) {
     console.error("Worker SRS context lookup failed", error);
-    return Response.json({ message: "无法读取复习排期。" }, { status: 500 });
+    return Response.json({ message: "Unable to read review schedule." }, { status: 500 });
   }
 
   const today = shanghaiDate();

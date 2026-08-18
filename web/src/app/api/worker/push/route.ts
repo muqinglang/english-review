@@ -60,7 +60,7 @@ function validateReview(value: unknown): ValidatedReview | null {
 
 export async function POST(request: Request) {
   const token = bearerToken(request);
-  if (!token) return Response.json({ message: "缺少 Worker 令牌。" }, { status: 401 });
+  if (!token) return Response.json({ message: "Missing Worker token." }, { status: 401 });
 
   const admin = createAdminClient();
   const { data: device, error: deviceError } = await admin
@@ -71,9 +71,9 @@ export async function POST(request: Request) {
     .maybeSingle();
   if (deviceError) {
     console.error("Worker authentication failed", deviceError);
-    return Response.json({ message: "无法验证 Worker 令牌。" }, { status: 500 });
+    return Response.json({ message: "Unable to verify Worker token." }, { status: 500 });
   }
-  if (!device) return Response.json({ message: "Worker 令牌无效或已撤销。" }, { status: 401 });
+  if (!device) return Response.json({ message: "Worker token is invalid or revoked." }, { status: 401 });
 
   // A device row may hold a secondary account id (e.g. a token registered before
   // account aliasing shipped). Resolve to the canonical owner so Worker syncs land
@@ -83,30 +83,30 @@ export async function POST(request: Request) {
   const ownerId = resolveAccountId(device.user_id);
 
   const body = await request.json().catch(() => null);
-  if (!isRecord(body)) return Response.json({ message: "推送格式无效。" }, { status: 400 });
+  if (!isRecord(body)) return Response.json({ message: "Invalid push format." }, { status: 400 });
   const displayName = nonEmptyString(body.space, 80);
   const practiceDate = body.practiceDate === undefined ? null : nonEmptyString(body.practiceDate, 10);
   const isGptPracticeSync = practiceDate !== null;
   const today = shanghaiDate();
   if (practiceDate !== null && (!isIsoDate(practiceDate) || practiceDate > today)) {
-    return Response.json({ message: "练习日期必须是今天或过去的上海日期。" }, { status: 400 });
+    return Response.json({ message: "Practice date must be today or a past Shanghai date." }, { status: 400 });
   }
   const items = validateItems(body.items);
   const review = body.review === undefined ? null : validateReview(body.review);
   if (!displayName || !items || (body.review !== undefined && !review) || (!items.length && !review) || (isGptPracticeSync && review)) {
-    return Response.json({ message: "推送格式无效；space、学习项和复习包字段必须非空且唯一。" }, { status: 400 });
+    return Response.json({ message: "Invalid push format; the space, learning items, and review package fields must be non-empty and unique." }, { status: 400 });
   }
   // Guard against merging several knowledge points into one item, but only on the
   // normalizedKey (the identity). The cue/answer are natural-language prose where
   // a slash is legitimate (e.g. the Chinese gloss "积分/额度" for one phrase).
   if (isGptPracticeSync && hasMergedKnowledgePoint(items)) {
-    return Response.json({ message: "每个学习项只能包含一个独立知识点；请拆分并列词汇、短语或语法点后重试。" }, { status: 400 });
+    return Response.json({ message: "Each learning item may contain only one distinct knowledge point; split combined words, phrases, or grammar points and try again." }, { status: 400 });
   }
   const scheduledItems = items;
   const itemByKey = new Map(scheduledItems.map((item) => [item.normalizedKey, item]));
   const orderedReviewItems = review ? review.itemKeys.map((key) => itemByKey.get(key)) : [];
   if (review && (items.length !== review.itemKeys.length || orderedReviewItems.some((item) => !item))) {
-    return Response.json({ message: "复习包中的 items 必须与 review.itemKeys 完整对应。" }, { status: 400 });
+    return Response.json({ message: "The items in the review package must correspond exactly to review.itemKeys." }, { status: 400 });
   }
 
   const { data: space, error: spaceError } = await admin
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
     .single();
   if (spaceError || !space) {
     console.error("Knowledge-space upsert failed", spaceError);
-    return Response.json({ message: "无法保存知识库。" }, { status: 500 });
+    return Response.json({ message: "Unable to save knowledge space." }, { status: 500 });
   }
 
   // A ChatGPT conversation is a short-term practice session, not an immediate
@@ -146,7 +146,7 @@ export async function POST(request: Request) {
       }, { onConflict: "user_id,source,payload_hash", ignoreDuplicates: true });
     if (sessionInsertError) {
       console.error("Practice-session save failed", sessionInsertError);
-      return Response.json({ message: "无法保存对话练习。" }, { status: 500 });
+      return Response.json({ message: "Unable to save conversation practice." }, { status: 500 });
     }
     const { data: session, error: sessionError } = await admin
       .from("practice_sessions")
@@ -157,7 +157,7 @@ export async function POST(request: Request) {
       .maybeSingle();
     if (sessionError || !session) {
       console.error("Practice-session lookup failed", sessionError);
-      return Response.json({ message: "无法确认对话练习已保存。" }, { status: 500 });
+      return Response.json({ message: "Unable to confirm the conversation practice was saved." }, { status: 500 });
     }
     const { data: practiceItems, error: practiceItemsError } = await admin
       .from("practice_items")
@@ -175,7 +175,7 @@ export async function POST(request: Request) {
       .select("id");
     if (practiceItemsError || !practiceItems || practiceItems.length !== items.length) {
       console.error("Practice-item save failed", practiceItemsError);
-      return Response.json({ message: "无法保存全部对话学习项。" }, { status: 500 });
+      return Response.json({ message: "Unable to save all conversation learning items." }, { status: 500 });
     }
     const { error: jobsError } = await admin
       .from("generation_jobs")
@@ -185,7 +185,7 @@ export async function POST(request: Request) {
       ])), { onConflict: "practice_item_id,kind", ignoreDuplicates: true });
     if (jobsError) {
       console.error("Generation-job queue failed", jobsError);
-      return Response.json({ message: "对话已保存，但无法创建内容生成任务。" }, { status: 500 });
+      return Response.json({ message: "Conversation saved, but content generation jobs could not be created." }, { status: 500 });
     }
     await admin.from("worker_devices").update({ last_seen_at: new Date().toISOString() }).eq("id", device.id);
     const richItemCount = items.filter((item) => item.example?.trim().startsWith("{")).length;
@@ -203,11 +203,11 @@ export async function POST(request: Request) {
       .in("normalized_key", scheduledItems.map((item) => item.normalizedKey));
     if (existingItemsError) {
       console.error("Existing learning-item lookup failed", existingItemsError);
-      return Response.json({ message: "无法检查已有学习项。" }, { status: 500 });
+      return Response.json({ message: "Unable to check existing learning items." }, { status: 500 });
     }
     if ((existingItems ?? []).some((item) => item.knowledge_space_id !== space.id)) {
       return Response.json(
-        { message: "相同学习项已经属于另一个知识库，不能静默移动。" },
+        { message: "This learning item already belongs to another knowledge space and cannot be moved silently." },
         { status: 409 },
       );
     }
@@ -229,7 +229,7 @@ export async function POST(request: Request) {
       .upsert(insertRows, { onConflict: "user_id,normalized_key", ignoreDuplicates: true });
     if (insertError) {
       console.error("Learning-item insert failed", insertError);
-      return Response.json({ message: "无法创建学习项。" }, { status: 500 });
+      return Response.json({ message: "Unable to create learning items." }, { status: 500 });
     }
 
     // Only content/source fields are updated here. SRS state and next_due are
@@ -252,7 +252,7 @@ export async function POST(request: Request) {
     const failedUpdate = updates.find((result) => result.error || !result.data);
     if (failedUpdate) {
       console.error("Learning-item content update failed", failedUpdate.error);
-      return Response.json({ message: "无法同步学习项内容。" }, { status: 500 });
+      return Response.json({ message: "Unable to sync learning item content." }, { status: 500 });
     }
   }
 
@@ -289,22 +289,22 @@ export async function POST(request: Request) {
     if (saveError) {
       if (saveError.code === "55000") {
         return Response.json(
-          { message: "无法安全更新：必须保留全部已发布题目，且新增题目仍需处于待复习状态。" },
+          { message: "Cannot update safely: all published items must be retained, and any new items must still be pending review." },
           { status: 409 },
         );
       }
       if (saveError.code === "22023") {
-        return Response.json({ message: "复习题目映射无效。" }, { status: 400 });
+        return Response.json({ message: "Invalid review item mapping." }, { status: 400 });
       }
       if (saveError.code === "42501") {
-        return Response.json({ message: "知识库不属于当前 Worker 用户。" }, { status: 403 });
+        return Response.json({ message: "The knowledge space does not belong to the current Worker user." }, { status: 403 });
       }
       console.error("Atomic daily-review save failed", saveError);
-      return Response.json({ message: "无法保存每日复习。" }, { status: 500 });
+      return Response.json({ message: "Unable to save the daily review." }, { status: 500 });
     }
     if (typeof savedReviewId !== "string" || !savedReviewId) {
       console.error("Atomic daily-review save returned no review id", { savedReviewId });
-      return Response.json({ message: "无法确认每日复习已保存。" }, { status: 500 });
+      return Response.json({ message: "Unable to confirm the daily review was saved." }, { status: 500 });
     }
     reviewSaved = true;
     reviewId = savedReviewId;

@@ -14,17 +14,17 @@ type TtsProvider = "fish_audio" | "elevenlabs";
 // character quota and the learner's own provider credentials.
 export async function POST(request: Request) {
   const user = await currentUser();
-  if (!user) return Response.json({ message: "请先登录。" }, { status: 401 });
+  if (!user) return Response.json({ message: "Please sign in first." }, { status: 401 });
 
   const body: unknown = await request.json().catch(() => null);
   if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return Response.json({ message: "请求内容无效。" }, { status: 400 });
+    return Response.json({ message: "Invalid request." }, { status: 400 });
   }
   const input = body as Record<string, unknown>;
   const text = typeof input.text === "string" ? input.text.trim() : "";
   const provider: TtsProvider = input.provider === "elevenlabs" ? "elevenlabs" : "fish_audio";
   if (!text || text.length > MAX_TEXT_LENGTH) {
-    return Response.json({ message: "文本为空或过长。" }, { status: 400 });
+    return Response.json({ message: "Text is empty or too long." }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -34,37 +34,37 @@ export async function POST(request: Request) {
     p_characters: characterCount,
   });
   if (reservationError) {
-    return Response.json({ message: "无法检查今日语音额度。" }, { status: 500 });
+    return Response.json({ message: "Unable to check today's voice quota." }, { status: 500 });
   }
   if (reserved !== true) {
-    return Response.json({ message: "今天的语音生成额度已达上限，请明天再试。" }, { status: 429 });
+    return Response.json({ message: "You've reached today's voice generation quota. Please try again tomorrow." }, { status: 429 });
   }
 
   let upstream: Response;
   try {
     if (provider === "elevenlabs") {
       const credential = await getElevenLabsCredential(user.id);
-      if (!credential) return Response.json({ message: "请先在设置中连接 ElevenLabs。" }, { status: 409 });
+      if (!credential) return Response.json({ message: "Please connect ElevenLabs in settings first." }, { status: 409 });
       const requestedVoiceId = typeof input.voiceId === "string" ? input.voiceId.trim() : undefined;
       upstream = await synthesizeElevenLabsAudio(credential, text, requestedVoiceId);
     } else {
       const credential = await getFishAudioCredential(user.id);
-      if (!credential) return Response.json({ message: "请先在设置中连接 Fish Audio。" }, { status: 409 });
+      if (!credential) return Response.json({ message: "Please connect Fish Audio in settings first." }, { status: 409 });
       upstream = await synthesizeFishAudio(credential, text);
     }
   } catch {
-    return Response.json({ message: "语音服务暂时无法连接，请稍后重试。" }, { status: 502 });
+    return Response.json({ message: "The voice service is temporarily unavailable. Please try again later." }, { status: 502 });
   }
 
   if (!upstream.ok || !upstream.body) {
     if (upstream.status === 429) {
       return Response.json(
-        { message: `${provider === "elevenlabs" ? "ElevenLabs" : "Fish Audio"} 额度不足或请求过于频繁。` },
+        { message: `${provider === "elevenlabs" ? "ElevenLabs" : "Fish Audio"} quota is insufficient or requests are too frequent.` },
         { status: 429 },
       );
     }
     return Response.json(
-      { message: `${provider === "elevenlabs" ? "ElevenLabs" : "Fish Audio"} 未能生成语音，请检查配置或稍后重试。` },
+      { message: `${provider === "elevenlabs" ? "ElevenLabs" : "Fish Audio"} could not generate audio. Please check your configuration or try again later.` },
       { status: 502 },
     );
   }

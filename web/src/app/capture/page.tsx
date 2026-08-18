@@ -25,14 +25,14 @@ export default async function CapturePage() {
       <div className="mx-auto max-w-4xl">
         <nav className="flex items-center justify-between gap-4">
           <Link href="/review" className="font-black">Chat Review</Link>
-          <Link href="/review" className="rounded-lg px-3 py-2 text-sm font-bold text-[#4e8a70] hover:bg-white">← 返回复习</Link>
+          <Link href="/review" className="rounded-lg px-3 py-2 text-sm font-bold text-[#4e8a70] hover:bg-white">← Back to review</Link>
         </nav>
         <header className="mt-12">
           <p className="text-sm font-extrabold tracking-[0.16em] text-[#4e8a70]">CAPTURE WHAT YOU LEARNED</p>
-          <h1 className="mt-3 text-4xl font-black sm:text-5xl">添加学习内容</h1>
-          <p className="mt-4 max-w-2xl leading-7 text-[#596861]">把 English Tranning 对话中不会、想复习的问题和答案放进复习系统。若内容来自昨天的对话，请把学习日期选为昨天；系统会在今天安排首次复习。</p>
+          <h1 className="mt-3 text-4xl font-black sm:text-5xl">Add content</h1>
+          <p className="mt-4 max-w-2xl leading-7 text-[#596861]">Add the questions and answers you didn&apos;t know—and want to review—from your English training conversations into the review system. If the content is from yesterday&apos;s conversation, set the learning date to yesterday; the system will schedule the first review for today.</p>
         </header>
-        {error && <p className="mt-8 rounded-xl bg-red-50 p-4 text-sm text-red-700" role="alert">知识库加载失败，请刷新后重试。</p>}
+        {error && <p className="mt-8 rounded-xl bg-red-50 p-4 text-sm text-red-700" role="alert">Failed to load knowledge spaces. Please refresh and try again.</p>}
         <LearningCaptureForm spaces={spaces} />
       </div>
     </main>
