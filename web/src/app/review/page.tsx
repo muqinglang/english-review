@@ -275,7 +275,7 @@ export default async function ReviewPage() {
           date: review.review_date,
           title: typeof content.title === "string" ? content.title : "Daily review",
           markdown: typeof content.markdown === "string" ? content.markdown : "",
-          duration: typeof content.durationMinutes === "string" ? content.durationMinutes : "8–12",
+          duration: typeof content.durationMinutes === "string" ? content.durationMinutes : "8-12",
           level: typeof content.level === "string" ? content.level : "B1",
           audioCards: Array.isArray(audio.cards) ? audio.cards : [],
           cards,

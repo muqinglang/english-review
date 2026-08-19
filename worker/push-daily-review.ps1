@@ -40,6 +40,19 @@ if ($audioDate -ne $ReviewDate) {
   throw "The audio JSON date '$audioDate' does not match ReviewDate '$ReviewDate'."
 }
 
+# The daily-review save RPC accepts a narrower type enum than the capture
+# pipeline (which also allows 'grammar'). Map any out-of-enum type to the closest
+# accepted one so a legitimately captured item can still enter a review. This is
+# applied only to the pushed review payload; the ledger/cloud keep their own type.
+$reviewTypeAllow = @('fact', 'concept', 'decision', 'quote', 'vocabulary', 'expression', 'error', 'pronunciation')
+$reviewTypeMap = @{ 'grammar' = 'expression' }
+function Resolve-ReviewType([string]$type) {
+  $trimmed = ([string]$type).Trim()
+  if ($reviewTypeAllow -contains $trimmed) { return $trimmed }
+  if ($reviewTypeMap.ContainsKey($trimmed)) { return $reviewTypeMap[$trimmed] }
+  return 'expression'
+}
+
 $audioCards = @()
 $items = @()
 $itemKeys = @()
@@ -86,7 +99,7 @@ foreach ($card in $audio.cards) {
   $itemKeys += $normalizedKey
   $items += [pscustomobject]@{
     normalizedKey = $normalizedKey
-    type = ([string]$ledgerItem.type).Trim()
+    type = (Resolve-ReviewType ([string]$ledgerItem.type))
     cue = $cue
     answer = $answer
     example = ([string]$ledgerItem.example).Trim()
@@ -105,7 +118,7 @@ $payload = [pscustomobject]@{
   review = [pscustomobject]@{
     reviewDate = $ReviewDate
     title = $reviewTitle
-    durationMinutes = "8–12"
+    durationMinutes = "8-12"
     level = "B1"
     contentMarkdown = $markdown
     audioCards = $audioCards
