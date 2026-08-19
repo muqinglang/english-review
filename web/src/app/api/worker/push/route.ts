@@ -309,6 +309,30 @@ export async function POST(request: Request) {
     reviewSaved = true;
     reviewId = savedReviewId;
     reviewDate = review.reviewDate;
+
+    // The save RPC inserts content_json only on first create (on conflict do
+    // nothing, to keep already-graded cards immutable). Re-pushing the same date
+    // must still be able to refresh purely-presentational fields (title, markdown,
+    // duration, level, audio script), so update them here. The gradeable
+    // review_items the RPC manages are untouched.
+    const { error: refreshError } = await admin
+      .from("reviews")
+      .update({
+        content_json: {
+          format: "markdown",
+          title: review.title,
+          markdown: review.contentMarkdown,
+          durationMinutes: review.durationMinutes,
+          level: review.level,
+        },
+        audio_script_json: { cards: review.audioCards },
+      })
+      .eq("id", savedReviewId)
+      .eq("user_id", ownerId);
+    if (refreshError) {
+      console.error("Daily-review content refresh failed", refreshError);
+      return Response.json({ message: "The review was saved but its display content could not be refreshed." }, { status: 500 });
+    }
   }
 
   await admin

@@ -128,22 +128,22 @@ foreach ($candidate in $selected) {
   $block = @()
   $block += "### $index. $([string]$item.normalized_key)"
   $block += ""
-  if ($rich.meaning) { $block += "- 核心含义：$($rich.meaning)" }
-  if ($rich.explanation) { $block += "- 通俗解释：$($rich.explanation)" }
-  if ($exampleParts.Count) { $block += "- 生活场景例句：$([string]::Join('  ', $exampleParts))" }
-  if ($rich.usageTip) { $block += "- 易混 / 使用提示：$($rich.usageTip)" }
+  if ($rich.meaning) { $block += "- Core meaning: $($rich.meaning)" }
+  if ($rich.explanation) { $block += "- How to think of it: $($rich.explanation)" }
+  if ($exampleParts.Count) { $block += "- In real life: $([string]::Join('  ', $exampleParts))" }
+  if ($rich.usageTip) { $block += "- Usage tip: $($rich.usageTip)" }
   $answerBlocks += ($block -join [Environment]::NewLine)
 }
 
 $nl = [Environment]::NewLine
 $md = @()
-$md += "# ☀️ 今日口语复习｜$ReviewDate"
+$md += "# ☀️ Daily Speaking Review | $ReviewDate"
 $md += ""
-$md += "## 先别看答案"
+$md += "## Recall first (don't peek)"
 $md += ""
 $md += $recallLines
 $md += ""
-$md += "## 答案与提示"
+$md += "## Answers & tips"
 $md += ""
 $md += ($answerBlocks -join ($nl + $nl))
 $markdown = ($md -join $nl)
