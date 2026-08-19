@@ -12,6 +12,22 @@ export type ElevenLabsPanelStatus = {
 
 const MAX_VOICES = 6;
 
+// Long-standing ElevenLabs stock voices grouped by accent. Preview uses the
+// user's own key, so they can confirm the accent before saving.
+const ACCENT_PRESETS: { accent: string; voices: Voice[] }[] = [
+  {
+    accent: "British",
+    voices: [{ voiceId: "JBFqnCBsd6RMkjVDRZzb", name: "George · British" }],
+  },
+  {
+    accent: "American",
+    voices: [
+      { voiceId: "21m00Tcm4TlvDq8ikWAM", name: "Rachel · American" },
+      { voiceId: "pNInz6obpgDQGcFmaJgB", name: "Adam · American" },
+    ],
+  },
+];
+
 export function ElevenLabsPanel({
   initialStatus,
   initialLoadError = false,
@@ -41,6 +57,15 @@ export function ElevenLabsPanel({
   }
   function addVoice() {
     setVoices((current) => (current.length >= MAX_VOICES ? current : [...current, { voiceId: "", name: "" }]));
+  }
+  function addPresetVoice(preset: Voice) {
+    setVoices((current) => {
+      if (current.some((voice) => voice.voiceId.trim() === preset.voiceId)) return current;
+      // Fill the first empty row if there is one, otherwise append (respecting the cap).
+      const emptyIndex = current.findIndex((voice) => !voice.voiceId.trim());
+      if (emptyIndex >= 0) return current.map((voice, i) => (i === emptyIndex ? { ...preset } : voice));
+      return current.length >= MAX_VOICES ? current : [...current, { ...preset }];
+    });
   }
   function removeVoice(index: number) {
     setVoices((current) => (current.length <= 1 ? current : current.filter((_, i) => i !== index)));
@@ -246,6 +271,29 @@ export function ElevenLabsPanel({
             + Add voice
           </button>
         )}
+
+        <div className="mt-4 rounded-xl border border-[#e3e9e3] bg-[#f8faf7] p-3">
+          <p className="text-xs font-extrabold text-[#6b7b74]">Quick add by accent</p>
+          <p className="mt-1 text-xs leading-5 text-[#819087]">Add a stock voice, then tap Preview to confirm the accent before saving. Switch voices per play from the Voice dropdown while reviewing.</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {ACCENT_PRESETS.flatMap((group) =>
+              group.voices.map((preset) => {
+                const added = voices.some((voice) => voice.voiceId.trim() === preset.voiceId);
+                return (
+                  <button
+                    key={preset.voiceId}
+                    type="button"
+                    onClick={() => addPresetVoice(preset)}
+                    disabled={busy || added || voices.length >= MAX_VOICES}
+                    className="rounded-lg border border-[#b9c9bf] bg-white px-3 py-1.5 text-xs font-bold text-[#315f4f] transition hover:bg-[#edf5ef] disabled:opacity-40"
+                  >
+                    {added ? "✓ " : "+ "}{preset.name}
+                  </button>
+                );
+              }),
+            )}
+          </div>
+        </div>
       </div>
 
       <label className="mt-5 block sm:max-w-xs">

@@ -11,6 +11,14 @@ export const DEFAULT_ELEVENLABS_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
 export const DEFAULT_ELEVENLABS_MODEL_ID = "eleven_flash_v2_5";
 export const MAX_ELEVENLABS_VOICES = 6;
 
+// A brand-new ElevenLabs setup ships with both a British and an American stock
+// voice so the per-play voice picker is useful immediately. The first entry is
+// the default. These are long-standing ElevenLabs premade voice IDs.
+export const DEFAULT_ELEVENLABS_VOICES: ElevenLabsVoice[] = [
+  { voiceId: "JBFqnCBsd6RMkjVDRZzb", name: "George · British" },
+  { voiceId: "21m00Tcm4TlvDq8ikWAM", name: "Rachel · American" },
+];
+
 const VOICE_ID_PATTERN = /^[A-Za-z0-9_-]{1,100}$/;
 
 export type ElevenLabsVoice = {
@@ -74,12 +82,12 @@ export function normalizeElevenLabsMetadata(
   let voices: ElevenLabsVoice[];
   if (rawVoices && rawVoices.length) {
     voices = rawVoices.slice(0, MAX_ELEVENLABS_VOICES).map(normalizeVoice);
+  } else if (typeof metadata.voiceId === "string" && metadata.voiceId.trim()) {
+    // Legacy single-voice rows keep their saved voice untouched.
+    voices = [normalizeVoice({ voiceId: metadata.voiceId.trim(), name: "Default voice" }, 0)];
   } else {
-    const legacyVoiceId =
-      typeof metadata.voiceId === "string" && metadata.voiceId.trim()
-        ? metadata.voiceId.trim()
-        : DEFAULT_ELEVENLABS_VOICE_ID;
-    voices = [normalizeVoice({ voiceId: legacyVoiceId, name: "Default voice" }, 0)];
+    // Nothing configured yet: seed the British + American default pair.
+    voices = DEFAULT_ELEVENLABS_VOICES.map(normalizeVoice);
   }
 
   // Drop duplicate voice IDs while preserving order and the caller's chosen
