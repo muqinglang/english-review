@@ -168,6 +168,12 @@ export async function POST(request: Request) {
   }
 
   if (!upstream.ok || !upstream.body) {
+    const detail = await upstream.text().catch(() => "");
+    console.error("TTS upstream failed", {
+      provider,
+      status: upstream.status,
+      detail: detail.slice(0, 400),
+    });
     if (upstream.status === 429) {
       return Response.json(
         { message: `${provider === "elevenlabs" ? "ElevenLabs" : "Fish Audio"} quota is insufficient or requests are too frequent.` },

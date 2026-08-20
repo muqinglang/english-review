@@ -302,13 +302,6 @@ export default async function ReviewPage() {
         </>
       }
     >
-      <header className="grid gap-3 py-10 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:py-14">
-        <div>
-          <p className="text-xs font-bold tracking-[0.12em] text-primary">CHAT REVIEW</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Turn what you can&apos;t into what you can.</h1>
-        </div>
-        <p className="max-w-sm text-sm leading-6 text-muted">Recall first, then check. Your self-rating decides when it shows up next.</p>
-      </header>
       {libraries.length ? (
         <ReviewLibrary libraries={libraries} loadWarning={structuredLoadError} elevenLabsVoices={elevenLabsVoices} />
       ) : (

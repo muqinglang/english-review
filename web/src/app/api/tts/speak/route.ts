@@ -57,6 +57,14 @@ export async function POST(request: Request) {
   }
 
   if (!upstream.ok || !upstream.body) {
+    const detail = await upstream.text().catch(() => "");
+    // Surface the real provider error (voice not on plan / bad key / quota) so a
+    // 502 fallback can actually be diagnosed from the logs. No user text logged.
+    console.error("TTS speak upstream failed", {
+      provider,
+      status: upstream.status,
+      detail: detail.slice(0, 400),
+    });
     if (upstream.status === 429) {
       return Response.json(
         { message: `${provider === "elevenlabs" ? "ElevenLabs" : "Fish Audio"} quota is insufficient or requests are too frequent.` },

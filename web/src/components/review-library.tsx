@@ -842,11 +842,10 @@ export function ReviewLibrary({
 
   return <>
     {loadWarning && <Alert tone="warning" role="alert" className="mt-8">Some structured review data couldn&apos;t load right now; older content is still visible. Refresh in a moment, and if it persists, check the database migrations and server logs.</Alert>}
-    <div className={`${loadWarning ? "mt-4" : "mt-8"} grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]`}>
-    <aside className="h-fit rounded-card border border-line bg-[#f8faf7] p-3">
-      <p className="px-3 pb-2 text-xs font-extrabold tracking-[0.14em] text-faint">Categories</p>
-      <div className="space-y-2">{libraries.map((item) => <button key={item.id} type="button" onClick={() => chooseLibrary(item.id)} className={`w-full rounded-card px-3 py-3 text-left text-sm font-extrabold transition ${item.id === library.id ? "bg-ink text-white" : "text-muted hover:bg-surface"}`}>{item.name}<span className={`mt-1 block text-xs font-medium ${item.id === library.id ? "text-white/60" : "text-faint"}`}>{item.reviews.length ? `${item.reviews.length} reviews` : "Waiting for content"}</span></button>)}</div>
-    </aside>
+    <div className={`${loadWarning ? "mt-4" : "mt-6"} space-y-4`}>
+    {libraries.length > 1 && <div className="flex flex-wrap gap-2" role="tablist" aria-label="Categories">
+      {libraries.map((item) => <button key={item.id} type="button" role="tab" aria-selected={item.id === library.id} onClick={() => chooseLibrary(item.id)} className={`inline-flex items-baseline gap-2 rounded-control px-4 py-2.5 text-sm font-extrabold transition ${item.id === library.id ? "bg-ink text-white" : "border border-line bg-surface text-muted hover:bg-mint"}`}>{item.name}<span className={`text-xs font-medium ${item.id === library.id ? "text-white/60" : "text-faint"}`}>{item.reviews.length ? `${item.reviews.length} reviews` : "Waiting"}</span></button>)}
+    </div>}
 
     <section className="min-w-0 rounded-card border border-line bg-surface p-5 sm:p-8">
       <div className="flex gap-1 rounded-card bg-[#f3f6f2] p-1.5" role="tablist" aria-label="Review content">
