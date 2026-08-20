@@ -510,10 +510,12 @@ export function ReviewLibrary({
   libraries,
   loadWarning = false,
   elevenLabsVoices = [],
+  deepSeekConfigured = false,
 }: {
   libraries: ReviewLibraryData[];
   loadWarning?: boolean;
   elevenLabsVoices?: { voiceId: string; name: string }[];
+  deepSeekConfigured?: boolean;
 }) {
   const [libraryId, setLibraryId] = useState(libraries[0]?.id ?? "");
   const [reviewId, setReviewId] = useState(libraries[0]?.reviews[0]?.id ?? "");
@@ -525,6 +527,9 @@ export function ReviewLibrary({
   const [audioNotice, setAudioNotice] = useState("");
   const [visibleAudioTranscripts, setVisibleAudioTranscripts] = useState<Record<string, boolean>>({});
   const [audioDrafts, setAudioDrafts] = useState<Record<string, string>>({});
+  const [storyByReview, setStoryByReview] = useState<Record<string, string>>({});
+  const [storyBusy, setStoryBusy] = useState(false);
+  const [storyError, setStoryError] = useState("");
   const [cardStates, setCardStates] = useState<Record<string, CardState>>({});
   const objectUrlsRef = useRef(new Map<string, string>());
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -561,7 +566,13 @@ export function ReviewLibrary({
     const saved = window.localStorage.getItem("english-review-tts-provider");
     const savedVoice = window.localStorage.getItem("english-review-elevenlabs-voice");
     const frame = window.requestAnimationFrame(() => {
-      if (saved === "fish_audio" || saved === "elevenlabs") setTtsProvider(saved);
+      if (saved === "fish_audio" || saved === "elevenlabs") {
+        setTtsProvider(saved);
+      } else if (elevenLabsVoices.length > 0) {
+        // No explicit choice yet: if the learner has configured ElevenLabs voices,
+        // play with them instead of silently defaulting to Fish Audio's voice.
+        setTtsProvider("elevenlabs");
+      }
       if (savedVoice && elevenLabsVoices.some((voice) => voice.voiceId === savedVoice)) {
         setSelectedVoiceId(savedVoice);
       }
@@ -746,7 +757,7 @@ export function ReviewLibrary({
   // Speak arbitrary on-page text (e.g. an example sentence) with the learner's
   // configured provider + selected voice, caching each clip and falling back to
   // the browser voice so a play tap is never silent.
-  async function playText(playbackId: string, text: string) {
+  async function playText(playbackId: string, text: string, speed: 1 | 0.75 = 1) {
     const trimmed = text.trim();
     if (!trimmed) return;
     cancelPlayback();
@@ -764,7 +775,7 @@ export function ReviewLibrary({
       fallbackStarted = true;
       audioRef.current = null;
       setAudioNotice("Couldn't generate audio this time; switched to the browser's English voice. Check your key or quota in Settings.");
-      speak(trimmed, 1, finish);
+      speak(trimmed, speed, finish);
     };
 
     try {
@@ -788,12 +799,40 @@ export function ReviewLibrary({
       if (sequence !== playbackSequenceRef.current) return;
 
       const audio = new Audio(objectUrl);
+      audio.playbackRate = speed;
       audioRef.current = audio;
       audio.onended = finish;
       audio.onerror = fallbackToBrowser;
       await audio.play();
     } catch {
       fallbackToBrowser();
+    }
+  }
+
+  // Ask DeepSeek (server-side) to weave the current review's due words into one
+  // short story, then let the learner listen/dictate it with the same voice.
+  async function generateStory(sourceReviewId: string) {
+    if (storyBusy) return;
+    cancelPlayback();
+    setStoryBusy(true);
+    setStoryError("");
+    try {
+      const response = await fetch("/api/listening/story", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviewId: sourceReviewId }),
+      });
+      const payload = await response.json().catch(() => null) as { story?: string; message?: string } | null;
+      if (!response.ok || !payload?.story) {
+        throw new Error(payload?.message ?? "Couldn't write a story right now. Please try again.");
+      }
+      if (!mountedRef.current) return;
+      setStoryByReview((current) => ({ ...current, [sourceReviewId]: payload.story! }));
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setStoryError(error instanceof Error ? error.message : "Couldn't write a story right now. Please try again.");
+    } finally {
+      if (mountedRef.current) setStoryBusy(false);
     }
   }
 
@@ -814,11 +853,12 @@ export function ReviewLibrary({
         <button type="button" role="tab" aria-selected={activeTab === "audio"} onClick={() => setActiveTab("audio")} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm font-extrabold transition ${activeTab === "audio" ? "bg-white text-[#172223] shadow-sm" : "text-[#718078] hover:text-[#41514b]"}`}><Headphones size={17} />Listening</button>
       </div>
 
-      {ttsProvider === "elevenlabs" && elevenLabsVoices.length > 1 && <label className="mt-4 flex flex-wrap items-center gap-2 text-sm font-bold text-[#596861]">
+      {ttsProvider === "elevenlabs" && elevenLabsVoices.length > 0 && <label className="mt-4 flex flex-wrap items-center gap-2 text-sm font-bold text-[#596861]">
         <SpeakerHigh size={16} className="text-[#2f755f]" />Voice
         <select value={selectedVoiceId} onChange={(event) => chooseVoice(event.target.value)} className="rounded-lg border border-[#dce4dc] bg-white px-3 py-2 text-sm">
           {elevenLabsVoices.map((voice) => <option key={voice.voiceId} value={voice.voiceId}>{voice.name}</option>)}
         </select>
+        <span className="text-xs font-medium text-[#819087]">ElevenLabs · this voice plays every clip below</span>
       </label>}
 
       {activeTab === "conversation" ? <>
@@ -854,6 +894,73 @@ export function ReviewLibrary({
             </div>
             {audioNotice && <div role="status" className="rounded-xl bg-[#fffaf0] p-4 text-sm leading-6 text-[#80631c]">{audioNotice}</div>}
             <span className="sr-only" aria-live="polite">{playing ? "Audio playing" : "Audio finished"}</span>
+
+            {(() => {
+              const story = storyByReview[review.id] ?? "";
+              const storyKey = JSON.stringify([review.id, "story"]);
+              const storyTranscriptVisible = visibleAudioTranscripts[storyKey] ?? false;
+              const storyDraft = audioDrafts[storyKey] ?? "";
+              const storyInputId = `audio-draft-${review.id}-story`;
+              const storyTranscriptId = `audio-transcript-${review.id}-story`;
+              return <article className="rounded-xl border border-[#c8d5cd] bg-[#f7fbf8] p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-extrabold tracking-[0.1em] text-[#2f755f]">STORY · Today&apos;s review words</p>
+                    <p className="mt-1 text-sm leading-6 text-[#4d5f57]">A short story woven from the words you have due for review. Generate it, listen, and write down what you hear.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => generateStory(review.id)}
+                    disabled={storyBusy}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#172223] px-4 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#2d3c3c] active:translate-y-px disabled:opacity-50"
+                  >
+                    {storyBusy ? "Writing a story…" : story ? "New story" : "Generate a story"}
+                  </button>
+                </div>
+
+                {!deepSeekConfigured && <p className="mt-3 rounded-lg bg-[#fffaf0] px-3 py-2 text-xs leading-5 text-[#80631c]">Connect DeepSeek in <a href="/settings" className="font-extrabold underline underline-offset-2">Settings</a> to write stories from your review words.</p>}
+                {storyError && <p role="alert" className="mt-3 rounded-lg bg-[#fff1ee] px-3 py-2 text-sm font-bold text-[#944c3f]">{storyError}</p>}
+
+                {story && <>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button type="button" aria-label="Play the story at normal speed" title="Normal speed" onClick={() => playText(`${review.id}:story:normal`, story, 1)} className="grid size-10 place-items-center rounded-xl bg-[#172223] text-white transition hover:bg-[#2d3c3c] active:translate-y-px"><Play size={17} weight="fill" /></button>
+                    <button type="button" aria-label="Play the story at slow speed" title="Slow speed" onClick={() => playText(`${review.id}:story:slow`, story, 0.75)} className="flex h-10 items-center gap-1.5 rounded-xl border border-[#b9c9bf] px-3 text-xs font-bold text-[#315f4f] transition hover:bg-[#edf5ef] active:translate-y-px"><SpeakerHigh size={16} />0.75×</button>
+                    <button
+                      type="button"
+                      aria-label={storyTranscriptVisible ? "Hide story text" : "Show story text"}
+                      aria-expanded={storyTranscriptVisible}
+                      aria-controls={storyTranscriptId}
+                      onClick={() => setVisibleAudioTranscripts((current) => ({ ...current, [storyKey]: !storyTranscriptVisible }))}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-[#c8d5cd] bg-white px-3 py-2 text-xs font-extrabold text-[#315f4f] transition hover:bg-[#edf5ef]"
+                    >
+                      {storyTranscriptVisible ? <EyeSlash size={16} /> : <Eye size={16} />}
+                      {storyTranscriptVisible ? "Hide text" : "Show text"}
+                    </button>
+                  </div>
+
+                  <label htmlFor={storyInputId} className="mt-5 block text-sm font-extrabold text-[#41514b]">Write what you hear</label>
+                  <textarea
+                    id={storyInputId}
+                    value={storyDraft}
+                    onChange={(event) => setAudioDrafts((current) => ({ ...current, [storyKey]: event.target.value }))}
+                    rows={4}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    placeholder="Write it from listening first, then tap “Show text” to check…"
+                    className="mt-2 w-full resize-y rounded-xl border border-[#cfd9d2] bg-[#fbfcfa] px-3.5 py-3 text-sm leading-6 text-[#172223] outline-none transition placeholder:text-[#617068] focus:border-[#4e8a70] focus:ring-2 focus:ring-[#4e8a70]/15"
+                  />
+
+                  <div id={storyTranscriptId} className={`mt-4 rounded-xl border px-4 py-3 ${storyTranscriptVisible ? "border-[#b8d2c2] bg-[#f1f8f3]" : "border-dashed border-[#dce4dc] bg-[#fafbf9]"}`}>
+                    {storyTranscriptVisible ? <>
+                      <p className="text-xs font-extrabold tracking-[0.1em] text-[#2f755f]">Story text</p>
+                      <p className="mt-2 text-base font-bold leading-7 text-[#172223]">{story}</p>
+                    </> : <p className="text-sm leading-6 text-[#596861]">Story text hidden. When you&apos;re done, tap “Show text” to check.</p>}
+                  </div>
+                </>}
+              </article>;
+            })()}
             {review.audioCards.map((card, index) => {
               const stateKey = JSON.stringify([review.id, card.id]);
               const normalPlaybackId = `${stateKey}:normal`;

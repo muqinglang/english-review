@@ -8,6 +8,8 @@ import { FishAudioPanel } from "@/components/fish-audio-panel";
 import { getFishAudioStatus, type FishAudioStatus } from "@/lib/fish-audio";
 import { ElevenLabsPanel } from "@/components/elevenlabs-panel";
 import { getElevenLabsStatus, type ElevenLabsStatus } from "@/lib/elevenlabs";
+import { DeepSeekPanel } from "@/components/deepseek-panel";
+import { getDeepSeekStatus, type DeepSeekStatus } from "@/lib/deepseek";
 import { VoiceProviderPreference } from "@/components/voice-provider-preference";
 
 export default async function SettingsPage() {
@@ -42,10 +44,16 @@ export default async function SettingsPage() {
       voices: [{ voiceId: "JBFqnCBsd6RMkjVDRZzb", name: "Default voice" }],
     },
   };
+  let deepSeekStatus: DeepSeekStatus = {
+    configured: false,
+    keySuffix: null,
+    metadata: { modelId: "deepseek-chat" },
+  };
   try {
-    [fishAudioStatus, elevenLabsStatus] = await Promise.all([
+    [fishAudioStatus, elevenLabsStatus, deepSeekStatus] = await Promise.all([
       getFishAudioStatus(user.id),
       getElevenLabsStatus(user.id),
+      getDeepSeekStatus(user.id),
     ]);
   } catch {
     // Keep the rest of Settings available while a migration is being applied.
@@ -76,6 +84,7 @@ export default async function SettingsPage() {
         <div className="mt-6"><VoiceProviderPreference fishConfigured={fishAudioStatus.configured} elevenLabsConfigured={elevenLabsStatus.configured} /></div>
         <div className="mt-6"><FishAudioPanel initialStatus={fishAudioStatus} /></div>
         <div className="mt-6"><ElevenLabsPanel initialStatus={elevenLabsStatus} /></div>
+        <div className="mt-6"><DeepSeekPanel initialStatus={deepSeekStatus} /></div>
         <div className="mt-6"><WorkerTokenPanel devices={devices} /></div>
       </div>
     </main>
