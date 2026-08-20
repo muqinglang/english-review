@@ -1,8 +1,28 @@
 @import "tailwindcss";
 
+/* Design tokens — single source of truth for the sage-green system.
+   Use the semantic utilities (bg-canvas, text-ink, bg-primary, bg-mint,
+   border-line, rounded-card, rounded-control) instead of raw hex so the
+   product stays consistent. */
+@theme {
+  --color-canvas: #f5f7f4;      /* app background */
+  --color-surface: #ffffff;     /* cards / inputs */
+  --color-ink: #16211f;         /* primary text + dark buttons */
+  --color-muted: #596861;       /* secondary text */
+  --color-faint: #819087;       /* tertiary / hints */
+  --color-primary: #2f755f;     /* brand green */
+  --color-primary-strong: #285e48;
+  --color-mint: #eaf3ec;        /* soft green highlight */
+  --color-line: #dce4dc;        /* borders / dividers */
+  --color-danger: #b4462f;      /* destructive text */
+
+  --radius-control: 12px;       /* buttons, inputs, chips */
+  --radius-card: 16px;          /* cards, panels */
+}
+
 :root {
-  --background: #f7f7f2;
-  --foreground: #172223;
+  --background: var(--color-canvas);
+  --foreground: var(--color-ink);
 }
 
 * { box-sizing: border-box; }

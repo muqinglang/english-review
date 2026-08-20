@@ -1,11 +1,11 @@
-import Link from "next/link";
-import { GearSix, Plus, SquaresFour } from "@phosphor-icons/react/dist/ssr";
+import { GearSix, Plus } from "@phosphor-icons/react/dist/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeElevenLabsMetadata, type ElevenLabsVoice } from "@/lib/elevenlabs";
 import { ReviewLibrary, type ReviewLibraryData } from "@/components/review-library";
+import { AppShell, AccountChip, NavIconLink } from "@/components/ui/app-shell";
 
 type JsonObject = Record<string, unknown>;
 type AttemptResult = "incorrect" | "partial" | "correct";
@@ -293,32 +293,30 @@ export default async function ReviewPage() {
   }));
 
   return (
-    <main className="min-h-[100dvh] bg-[#f4f6f3] px-4 py-4 text-[#172223] sm:px-8 sm:py-6">
-      <div className="mx-auto max-w-7xl">
-        <nav className="flex items-center justify-between border-b border-[#d9dfd8] pb-4">
-          <Link href="/" className="flex items-center gap-2 text-sm font-black tracking-tight"><span className="grid size-8 place-items-center rounded-xl bg-[#172223] text-white"><SquaresFour size={17} weight="fill" /></span>Chat Review</Link>
-          <div className="flex items-center gap-2">
-            <span className="hidden max-w-28 truncate text-xs font-bold text-[#4e8a70] sm:inline" title={user.email ?? undefined}>{accountLabel}</span>
-            <Link href="/capture" aria-label="Add content" title="Add content" className="grid size-9 place-items-center rounded-xl bg-[#172223] text-white transition hover:bg-[#2e403c] active:translate-y-px"><Plus size={18} weight="bold" /></Link>
-            <Link href="/settings" aria-label="Settings" title="Settings" className="grid size-9 place-items-center rounded-xl border border-[#cdd6cf] bg-white text-[#41514b] transition hover:border-[#8eaa9a] active:translate-y-px"><GearSix size={18} /></Link>
-          </div>
-        </nav>
-        <header className="grid gap-3 py-10 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:py-14">
-          <div>
-            <p className="text-xs font-bold tracking-[0.12em] text-[#4e8a70]">ENGLISH REVIEW</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Turn what you can&apos;t into what you can.</h1>
-          </div>
-          <p className="max-w-sm text-sm leading-6 text-[#596861]">Recall first, then check. Your self-rating decides when it shows up next.</p>
-        </header>
-        {libraries.length ? (
-          <ReviewLibrary libraries={libraries} loadWarning={structuredLoadError} elevenLabsVoices={elevenLabsVoices} />
-        ) : (
-          <section className="mt-8 rounded-2xl border border-[#dce4dc] bg-white p-10 text-center">
-            <h2 className="text-xl font-black">No review categories yet</h2>
-            <p className="mt-3 text-[#718078]">Connect your local Worker and push the first daily review — it&apos;ll show up here.</p>
-          </section>
-        )}
-      </div>
-    </main>
+    <AppShell
+      right={
+        <>
+          <AccountChip label={accountLabel} email={user.email} />
+          <NavIconLink href="/capture" label="Add content" variant="primary"><Plus size={18} weight="bold" /></NavIconLink>
+          <NavIconLink href="/settings" label="Settings"><GearSix size={18} /></NavIconLink>
+        </>
+      }
+    >
+      <header className="grid gap-3 py-10 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end sm:py-14">
+        <div>
+          <p className="text-xs font-bold tracking-[0.12em] text-primary">CHAT REVIEW</p>
+          <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Turn what you can&apos;t into what you can.</h1>
+        </div>
+        <p className="max-w-sm text-sm leading-6 text-muted">Recall first, then check. Your self-rating decides when it shows up next.</p>
+      </header>
+      {libraries.length ? (
+        <ReviewLibrary libraries={libraries} loadWarning={structuredLoadError} elevenLabsVoices={elevenLabsVoices} />
+      ) : (
+        <section className="mt-8 rounded-card border border-line bg-surface p-10 text-center">
+          <h2 className="text-xl font-black">No review categories yet</h2>
+          <p className="mt-3 text-faint">Connect your local Worker and push the first daily review — it&apos;ll show up here.</p>
+        </section>
+      )}
+    </AppShell>
   );
 }

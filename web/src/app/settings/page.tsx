@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
+import { AppShell, BackToReviewLink } from "@/components/ui/app-shell";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { LogoutButton } from "@/components/logout-button";
 import { WorkerTokenPanel, type WorkerDevice } from "@/components/worker-token-panel";
@@ -60,33 +60,27 @@ export default async function SettingsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f4f6f3] px-4 py-5 text-[#172223] sm:px-10 sm:py-8">
-      <div className="mx-auto max-w-4xl">
-        <nav className="flex items-center justify-between">
-          <Link href="/review" className="font-black">Chat Review</Link>
-          <Link href="/review" className="rounded-lg px-3 py-2 text-sm font-bold text-[#4e8a70] hover:bg-white">Back to review</Link>
-        </nav>
-        <header className="mt-12">
-          <p className="text-sm font-extrabold tracking-[0.16em] text-[#4e8a70]">SETTINGS</p>
-          <h1 className="mt-3 text-4xl font-black sm:text-5xl">Settings</h1>
-          <p className="mt-4 text-[#596861]">Manage your account, local sync devices, and voice services.</p>
-        </header>
-        <section className="mt-8 rounded-2xl border border-[#dce4dc] bg-white p-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-extrabold tracking-[0.12em] text-[#6d7a74]">Account</p>
-              <p className="mt-2 font-extrabold">{user.email ?? "Signed-in user"}</p>
-              <p className="mt-1 text-sm text-[#76837c]">Securely authenticated via Supabase</p>
-            </div>
-            <LogoutButton />
+    <AppShell width="narrow" right={<BackToReviewLink />}>
+      <header className="mt-10 sm:mt-12">
+        <p className="text-sm font-extrabold tracking-[0.16em] text-primary">SETTINGS</p>
+        <h1 className="mt-3 text-4xl font-black sm:text-5xl">Settings</h1>
+        <p className="mt-4 text-muted">Manage your account, local sync devices, and voice services.</p>
+      </header>
+      <section className="mt-8 rounded-card border border-line bg-surface p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-extrabold tracking-[0.12em] text-faint">Account</p>
+            <p className="mt-2 font-extrabold">{user.email ?? "Signed-in user"}</p>
+            <p className="mt-1 text-sm text-muted">Securely authenticated via Supabase</p>
           </div>
-        </section>
-        <div className="mt-6"><VoiceProviderPreference fishConfigured={fishAudioStatus.configured} elevenLabsConfigured={elevenLabsStatus.configured} /></div>
-        <div className="mt-6"><FishAudioPanel initialStatus={fishAudioStatus} /></div>
-        <div className="mt-6"><ElevenLabsPanel initialStatus={elevenLabsStatus} /></div>
-        <div className="mt-6"><DeepSeekPanel initialStatus={deepSeekStatus} /></div>
-        <div className="mt-6"><WorkerTokenPanel devices={devices} /></div>
-      </div>
-    </main>
+          <LogoutButton />
+        </div>
+      </section>
+      <div className="mt-6"><VoiceProviderPreference fishConfigured={fishAudioStatus.configured} elevenLabsConfigured={elevenLabsStatus.configured} /></div>
+      <div className="mt-6"><FishAudioPanel initialStatus={fishAudioStatus} /></div>
+      <div className="mt-6"><ElevenLabsPanel initialStatus={elevenLabsStatus} /></div>
+      <div className="mt-6"><DeepSeekPanel initialStatus={deepSeekStatus} /></div>
+      <div className="mt-6"><WorkerTokenPanel devices={devices} /></div>
+    </AppShell>
   );
 }
