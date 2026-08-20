@@ -510,12 +510,10 @@ export function ReviewLibrary({
   libraries,
   loadWarning = false,
   elevenLabsVoices = [],
-  deepSeekConfigured = false,
 }: {
   libraries: ReviewLibraryData[];
   loadWarning?: boolean;
   elevenLabsVoices?: { voiceId: string; name: string }[];
-  deepSeekConfigured?: boolean;
 }) {
   const [libraryId, setLibraryId] = useState(libraries[0]?.id ?? "");
   const [reviewId, setReviewId] = useState(libraries[0]?.reviews[0]?.id ?? "");
@@ -918,7 +916,6 @@ export function ReviewLibrary({
                   </button>
                 </div>
 
-                {!deepSeekConfigured && <p className="mt-3 rounded-lg bg-[#fffaf0] px-3 py-2 text-xs leading-5 text-[#80631c]">Connect DeepSeek in <a href="/settings" className="font-extrabold underline underline-offset-2">Settings</a> to write stories from your review words.</p>}
                 {storyError && <p role="alert" className="mt-3 rounded-lg bg-[#fff1ee] px-3 py-2 text-sm font-bold text-[#944c3f]">{storyError}</p>}
 
                 {story && <>

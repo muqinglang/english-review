@@ -94,11 +94,9 @@ export default async function ReviewPage() {
       .in("provider", ["elevenlabs", "deepseek"]),
   ]);
   let elevenLabsVoices: ElevenLabsVoice[] = [];
-  let deepSeekConfigured = false;
   for (const row of integrationRows ?? []) {
     try {
       if (row.provider === "elevenlabs") elevenLabsVoices = normalizeElevenLabsMetadata(row.metadata).voices;
-      else if (row.provider === "deepseek") deepSeekConfigured = true;
     } catch {
       // A malformed integration row must never break the review page.
     }
@@ -313,7 +311,7 @@ export default async function ReviewPage() {
           <p className="max-w-sm text-sm leading-6 text-[#596861]">Recall first, then check. Your self-rating decides when it shows up next.</p>
         </header>
         {libraries.length ? (
-          <ReviewLibrary libraries={libraries} loadWarning={structuredLoadError} elevenLabsVoices={elevenLabsVoices} deepSeekConfigured={deepSeekConfigured} />
+          <ReviewLibrary libraries={libraries} loadWarning={structuredLoadError} elevenLabsVoices={elevenLabsVoices} />
         ) : (
           <section className="mt-8 rounded-2xl border border-[#dce4dc] bg-white p-10 text-center">
             <h2 className="text-xl font-black">No review categories yet</h2>

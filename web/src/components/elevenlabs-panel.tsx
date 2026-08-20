@@ -10,7 +10,7 @@ export type ElevenLabsPanelStatus = {
   metadata: { voiceId: string; modelId: string; voices: Voice[] };
 };
 
-const MAX_VOICES = 6;
+const MAX_VOICES = 10;
 
 // Long-standing ElevenLabs stock voices grouped by accent. Preview uses the
 // user's own key, so they can confirm the accent before saving.
@@ -44,6 +44,7 @@ export function ElevenLabsPanel({
   const [notice, setNotice] = useState("");
   const [loadError, setLoadError] = useState(initialLoadError);
   const [previewing, setPreviewing] = useState<number | null>(null);
+  const [importing, setImporting] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
 
@@ -109,6 +110,54 @@ export function ElevenLabsPanel({
       setError("Could not reach the settings service. Check your connection and try again.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Pull the voices the saved key can actually use (server-side call to
+  // /v1/voices) and add the ones not already listed, up to the cap. This removes
+  // the guesswork of which Voice IDs the learner's plan is allowed to synthesize.
+  async function importVoices() {
+    setImporting(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/integrations/elevenlabs/voices");
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(body.message ?? "Couldn't load your ElevenLabs voices. Save your API key first, then try again.");
+        return;
+      }
+      const fetched = (Array.isArray(body.voices) ? body.voices : []) as { voiceId: string; name: string }[];
+      if (!fetched.length) {
+        setNotice("No voices were found on your ElevenLabs account.");
+        return;
+      }
+      let addedCount = 0;
+      let available = 0;
+      setVoices((current) => {
+        const kept = current.filter((voice) => voice.voiceId.trim());
+        const existing = new Set(kept.map((voice) => voice.voiceId.trim()));
+        const additions = fetched.filter((voice) => voice.voiceId && !existing.has(voice.voiceId));
+        available = additions.length;
+        const merged = [...kept];
+        for (const voice of additions) {
+          if (merged.length >= MAX_VOICES) break;
+          merged.push({ voiceId: voice.voiceId, name: (voice.name || "Voice").slice(0, 40) });
+          addedCount += 1;
+        }
+        return merged.length ? merged : current;
+      });
+      if (addedCount === 0) {
+        setNotice("Your usable ElevenLabs voices are already in the list.");
+      } else if (addedCount < available) {
+        setNotice(`Added ${addedCount} voice${addedCount > 1 ? "s" : ""} (list is full at ${MAX_VOICES}). Review and tap “Save configuration”.`);
+      } else {
+        setNotice(`Added ${addedCount} usable voice${addedCount > 1 ? "s" : ""}. Review the list and tap “Save configuration”.`);
+      }
+    } catch {
+      setError("Could not reach the settings service. Check your connection and try again.");
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -261,15 +310,32 @@ export function ElevenLabsPanel({
             </div>
           ))}
         </div>
-        {voices.length < MAX_VOICES && (
-          <button
-            type="button"
-            onClick={addVoice}
-            disabled={busy}
-            className="mt-3 rounded-lg border border-dashed border-[#b9c9bf] px-4 py-2 text-sm font-bold text-[#315f4f] transition hover:bg-[#edf5ef] disabled:opacity-50"
-          >
-            + Add voice
-          </button>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {voices.length < MAX_VOICES && (
+            <button
+              type="button"
+              onClick={addVoice}
+              disabled={busy}
+              className="rounded-lg border border-dashed border-[#b9c9bf] px-4 py-2 text-sm font-bold text-[#315f4f] transition hover:bg-[#edf5ef] disabled:opacity-50"
+            >
+              + Add voice
+            </button>
+          )}
+          {status.configured && (
+            <button
+              type="button"
+              onClick={importVoices}
+              disabled={busy || importing}
+              className="rounded-lg border border-[#b9c9bf] bg-white px-4 py-2 text-sm font-bold text-[#315f4f] transition hover:bg-[#edf5ef] disabled:opacity-50"
+            >
+              {importing ? "Importing…" : "Import my usable voices"}
+            </button>
+          )}
+        </div>
+        {status.configured && (
+          <p className="mt-2 text-xs leading-5 text-[#819087]">
+            “Import my usable voices” pulls every voice your saved key is allowed to use, so you never hit a plan-permission error. Then tap Save.
+          </p>
         )}
 
         <div className="mt-4 rounded-xl border border-[#e3e9e3] bg-[#f8faf7] p-3">
