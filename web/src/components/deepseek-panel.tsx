@@ -1,6 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert } from "@/components/ui/alert";
+import { Input } from "@/components/ui/field";
 
 export type DeepSeekPanelStatus = {
   configured: boolean;
@@ -76,101 +81,97 @@ export function DeepSeekPanel({
   }
 
   return (
-    <section className="rounded-2xl border border-[#dce4dc] bg-white p-6">
+    <Card>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black">DeepSeek Story Writer</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#617068]">
+          <h2 className="text-lg font-black text-ink">DeepSeek Story Writer</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
             Uses DeepSeek to weave the words you have due for review into one short story for listening practice. Your API Key is sent only to this site&apos;s server and stored encrypted.
           </p>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-[#617068]">
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
             <a
               href="https://platform.deepseek.com/api_keys"
               target="_blank"
               rel="noreferrer"
-              className="font-bold text-[#2f755f] underline underline-offset-2"
+              className="font-bold text-primary underline underline-offset-2"
             >
               Get an API Key from DeepSeek
             </a>
             .
           </p>
         </div>
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-extrabold ${
-            status.configured ? "bg-[#e4f3e8] text-[#2f755f]" : "bg-[#eeeeea] text-[#788179]"
-          }`}
-        >
+        <Badge tone={status.configured ? "success" : "neutral"}>
           {status.configured ? "Credentials saved" : "Not configured"}
-        </span>
+        </Badge>
       </div>
 
       {status.configured && status.keySuffix && (
-        <p className="mt-5 text-sm text-[#456457]">
+        <p className="mt-5 text-sm text-primary-strong">
           Saved key: <code>••••{status.keySuffix}</code>
         </p>
       )}
 
       {loadError && (
-        <p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-800" role="alert">
+        <Alert tone="warning" role="alert" className="mt-5">
           DeepSeek configuration is temporarily unavailable. A database update may still be deploying; refresh and try again later.
-        </p>
+        </Alert>
       )}
 
       <label className="mt-5 block">
-        <span className="text-sm font-extrabold">API Key</span>
-        <input
+        <span className="text-sm font-extrabold text-ink">API Key</span>
+        <Input
           type="password"
           value={apiKey}
           onChange={(event) => setApiKey(event.target.value)}
           autoComplete="off"
           spellCheck={false}
-          className="mt-2 w-full rounded-xl border border-[#cfd9d2] px-4 py-3 outline-none focus:border-[#4e8a70]"
+          className="mt-2"
           placeholder={status.configured ? "Leave blank to keep the current key, or paste to replace it" : "Paste your DeepSeek API Key"}
         />
       </label>
 
       <label className="mt-5 block sm:max-w-xs">
-        <span className="text-sm font-extrabold">Model</span>
-        <input
+        <span className="text-sm font-extrabold text-ink">Model</span>
+        <Input
           value={modelId}
           onChange={(event) => setModelId(event.target.value)}
           autoComplete="off"
           spellCheck={false}
-          className="mt-2 w-full rounded-xl border border-[#cfd9d2] px-4 py-3 outline-none focus:border-[#4e8a70]"
+          className="mt-2"
         />
       </label>
 
       <div className="mt-5 flex flex-wrap gap-3">
-        <button
+        <Button
+          variant="primary"
           type="button"
           onClick={saveConfiguration}
           disabled={busy || !modelId.trim() || (!status.configured && !apiKey.trim())}
-          className="rounded-xl bg-[#172223] px-5 py-3 font-bold text-white disabled:opacity-50"
         >
           {busy ? "Processing…" : "Save configuration"}
-        </button>
+        </Button>
         {status.configured && (
-          <button
+          <Button
+            variant="danger"
             type="button"
             onClick={deleteConfiguration}
             disabled={busy}
-            className="rounded-xl border border-red-200 px-5 py-3 font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
           >
             Delete credentials
-          </button>
+          </Button>
         )}
       </div>
 
       {notice && (
-        <p className="mt-4 rounded-xl bg-[#f0f8f2] p-4 text-sm text-[#285e48]" role="status">
+        <Alert tone="success" role="status" className="mt-4">
           {notice}
-        </p>
+        </Alert>
       )}
       {error && (
-        <p className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-700" role="alert">
+        <Alert tone="error" role="alert" className="mt-4">
           {error}
-        </p>
+        </Alert>
       )}
-    </section>
+    </Card>
   );
 }

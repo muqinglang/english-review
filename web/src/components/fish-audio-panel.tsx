@@ -1,6 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert } from "@/components/ui/alert";
+import { Input } from "@/components/ui/field";
 
 export type FishAudioPanelStatus = { configured: boolean; keySuffix: string | null; metadata: { referenceId: string | null; modelId: string } };
 
@@ -54,10 +59,10 @@ export function FishAudioPanel({ initialStatus }: { initialStatus: FishAudioPane
     finally { setBusy(false); }
   }
 
-  return <section className="rounded-2xl border border-[#dce4dc] bg-white p-6">
-    <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-black">Fish Audio Voice</h2><p className="mt-2 max-w-xl text-sm leading-6 text-[#617068]">Generate listening audio for English answers and example sentences. Your key is sent only to this site&apos;s server and stored encrypted; &quot;Credentials saved&quot; does not mean the key has been verified by the service.</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold ${status.configured ? "bg-[#e4f3e8] text-[#2f755f]" : "bg-[#eeeeea] text-[#788179]"}`}>{status.configured ? "Credentials saved" : "Not configured"}</span></div>
-    <div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="sm:col-span-2"><span className="text-sm font-bold">API Key</span><input type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} autoComplete="off" className="mt-2 w-full rounded-xl border border-[#cfd9d2] px-4 py-3 outline-none focus:border-[#4e8a70]" placeholder={status.configured ? "Leave blank to keep the current key" : "Paste your Fish Audio API Key"} /></label><label><span className="text-sm font-bold">Voice ID (optional)</span><input value={referenceId} onChange={(event) => setReferenceId(event.target.value)} className="mt-2 w-full rounded-xl border border-[#cfd9d2] px-4 py-3 outline-none focus:border-[#4e8a70]" placeholder="Leave blank to use the default English voice" /></label><div className="self-end text-sm leading-6 text-[#617068]">Model: <code>s2-pro</code></div></div>
-    <div className="mt-5 flex flex-wrap items-center gap-3"><button type="button" disabled={busy || (!status.configured && !apiKey.trim())} onClick={save} className="rounded-xl bg-[#172223] px-5 py-3 font-bold text-white disabled:opacity-50">{busy ? "Saving…" : "Save"}</button><button type="button" disabled={testing || !status.configured} onClick={testVoice} className="rounded-xl border border-[#b9c9bf] bg-white px-5 py-3 font-bold text-[#315f4f] disabled:opacity-50">{testing ? "Testing…" : "Test voice"}</button>{status.configured && <button type="button" disabled={busy} onClick={removeConfiguration} className="rounded-xl border border-red-200 px-5 py-3 font-bold text-red-700 disabled:opacity-50">Delete credentials</button>}{status.keySuffix && <span className="text-sm text-[#617068]">Saved key ending: {status.keySuffix}</span>}</div>
-    {notice && <p role="status" className="mt-4 text-sm font-bold text-[#286247]">{notice}</p>}{error && <p role="alert" className="mt-4 text-sm font-bold text-[#9b3c2f]">{error}</p>}
-  </section>;
+  return <Card>
+    <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-black text-ink">Fish Audio Voice</h2><p className="mt-2 max-w-xl text-sm leading-6 text-muted">Generate listening audio for English answers and example sentences. Your key is sent only to this site&apos;s server and stored encrypted; &quot;Credentials saved&quot; does not mean the key has been verified by the service.</p></div><Badge tone={status.configured ? "success" : "neutral"}>{status.configured ? "Credentials saved" : "Not configured"}</Badge></div>
+    <div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="sm:col-span-2"><span className="text-sm font-bold text-ink">API Key</span><Input type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} autoComplete="off" className="mt-2" placeholder={status.configured ? "Leave blank to keep the current key" : "Paste your Fish Audio API Key"} /></label><label><span className="text-sm font-bold text-ink">Voice ID (optional)</span><Input value={referenceId} onChange={(event) => setReferenceId(event.target.value)} className="mt-2" placeholder="Leave blank to use the default English voice" /></label><div className="self-end text-sm leading-6 text-muted">Model: <code>s2-pro</code></div></div>
+    <div className="mt-5 flex flex-wrap items-center gap-3"><Button variant="primary" type="button" disabled={busy || (!status.configured && !apiKey.trim())} onClick={save}>{busy ? "Saving…" : "Save"}</Button><Button variant="secondary" type="button" disabled={testing || !status.configured} onClick={testVoice}>{testing ? "Testing…" : "Test voice"}</Button>{status.configured && <Button variant="danger" type="button" disabled={busy} onClick={removeConfiguration}>Delete credentials</Button>}{status.keySuffix && <span className="text-sm text-muted">Saved key ending: {status.keySuffix}</span>}</div>
+    {notice && <Alert tone="success" role="status" className="mt-4 font-bold">{notice}</Alert>}{error && <Alert tone="error" role="alert" className="mt-4 font-bold">{error}</Alert>}
+  </Card>;
 }

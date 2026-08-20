@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CaretDown, CaretUp, ClipboardText } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/field";
 
 /** Extract a JSON object from raw text or a ```english-review-sync fenced block. */
 function extractPayload(raw: string): unknown {
@@ -55,27 +58,27 @@ export function ConversationImport() {
     }
   }
 
-  return <section className="mt-5 rounded-2xl border border-[#dce4dc] bg-white p-4 sm:p-5">
+  return <Card className="mt-5 p-4 sm:p-5">
     <button type="button" onClick={() => setOpen((value) => !value)} className="flex w-full items-center justify-between gap-2 text-left">
-      <span className="flex items-center gap-2 text-base font-black text-[#172223]"><ClipboardText size={18} weight="bold" />Paste import</span>
-      <span className="flex items-center gap-1 text-xs font-bold text-[#4e8a70]">{open ? "Collapse" : "Paste sync code from ChatGPT"}{open ? <CaretUp size={14} /> : <CaretDown size={14} />}</span>
+      <span className="flex items-center gap-2 text-base font-black text-ink"><ClipboardText size={18} weight="bold" />Paste import</span>
+      <span className="flex items-center gap-1 text-xs font-bold text-primary">{open ? "Collapse" : "Paste sync code from ChatGPT"}{open ? <CaretUp size={14} /> : <CaretDown size={14} />}</span>
     </button>
     {open && <div className="mt-4">
-      <p className="text-sm leading-6 text-[#617068]">Paste the whole <code className="rounded bg-[#edf3ed] px-1 py-0.5 text-[0.85em]">english-review-sync</code> block from ChatGPT and hit Import to start reviewing — no Chrome extension or token needed.</p>
-      <textarea
+      <p className="text-sm leading-6 text-muted">Paste the whole <code className="rounded bg-mint px-1 py-0.5 text-[0.85em]">english-review-sync</code> block from ChatGPT and hit Import to start reviewing — no Chrome extension or token needed.</p>
+      <Textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
         rows={5}
         spellCheck={false}
         autoComplete="off"
         placeholder={'Paste {"space":"English Review","practiceDate":"...","items":[...]} or the whole ```english-review-sync block'}
-        className="mt-3 w-full resize-y rounded-xl border border-[#cfd9d2] bg-[#fbfcfa] px-3.5 py-3 font-mono text-xs leading-6 text-[#172223] outline-none transition focus:border-[#4e8a70] focus:ring-2 focus:ring-[#4e8a70]/15"
+        className="mt-3 font-mono text-xs"
       />
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button type="button" disabled={busy || !text.trim()} onClick={runImport} className="rounded-xl bg-[#172223] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#2d3c3c] disabled:opacity-50">{busy ? "Importing…" : "Import"}</button>
-        {notice && <span role="status" className="text-sm font-bold text-[#286247]">{notice}</span>}
-        {error && <span role="alert" className="text-sm font-bold text-[#9b3c2f]">{error}</span>}
+        <Button type="button" variant="primary" size="sm" disabled={busy || !text.trim()} onClick={runImport}>{busy ? "Importing…" : "Import"}</Button>
+        {notice && <span role="status" className="text-sm font-bold text-primary-strong">{notice}</span>}
+        {error && <span role="alert" className="text-sm font-bold text-danger">{error}</span>}
       </div>
     </div>}
-  </section>;
+  </Card>;
 }

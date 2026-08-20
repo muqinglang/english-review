@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { Button } from "@/components/ui/button";
 
 export function LogoutButton() {
   const router = useRouter();
@@ -14,5 +15,5 @@ export function LogoutButton() {
     router.push("/login");
     router.refresh();
   }
-  return <button onClick={logout} disabled={busy} className="rounded-xl border border-red-200 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50">{busy ? "Signing out…" : "Sign out"}</button>;
+  return <Button variant="danger" size="sm" onClick={logout} disabled={busy}>{busy ? "Signing out…" : "Sign out"}</Button>;
 }

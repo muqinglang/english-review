@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert } from "@/components/ui/alert";
+import { Input } from "@/components/ui/field";
 
 type Voice = { voiceId: string; name: string };
 
@@ -202,109 +207,107 @@ export function ElevenLabsPanel({
   }
 
   return (
-    <section className="rounded-2xl border border-[#dce4dc] bg-white p-6">
+    <Card>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-black">ElevenLabs Voice</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#617068]">
+          <h2 className="text-lg font-black text-ink">ElevenLabs Voice</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
             Generate review audio with ElevenLabs. Your API Key is sent only to this site&apos;s server and stored encrypted.
           </p>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-[#617068]">
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
             <a
               href="https://elevenlabs.io/app/developers/api-keys"
               target="_blank"
               rel="noreferrer"
-              className="font-bold text-[#2f755f] underline underline-offset-2"
+              className="font-bold text-primary underline underline-offset-2"
             >
               Get an API Key from ElevenLabs
             </a>
             . We recommend granting Text to Speech access only and setting a quota limit.
           </p>
         </div>
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-extrabold ${
-            status.configured ? "bg-[#e4f3e8] text-[#2f755f]" : "bg-[#eeeeea] text-[#788179]"
-          }`}
-        >
+        <Badge tone={status.configured ? "success" : "neutral"}>
           {status.configured ? "Credentials saved" : "Not configured"}
-        </span>
+        </Badge>
       </div>
 
       {status.configured && status.keySuffix && (
-        <p className="mt-5 text-sm text-[#456457]">
+        <p className="mt-5 text-sm text-primary-strong">
           Saved key: <code>••••{status.keySuffix}</code>
         </p>
       )}
 
       {loadError && (
-        <p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-800" role="alert">
+        <Alert tone="warning" role="alert" className="mt-5">
           Voice configuration is temporarily unavailable. A database update may still be deploying; refresh and try again later.
-        </p>
+        </Alert>
       )}
 
       <label className="mt-5 block">
-        <span className="text-sm font-extrabold">API Key</span>
-        <input
+        <span className="text-sm font-extrabold text-ink">API Key</span>
+        <Input
           type="password"
           value={apiKey}
           onChange={(event) => setApiKey(event.target.value)}
           autoComplete="off"
           spellCheck={false}
-          className="mt-2 w-full rounded-xl border border-[#cfd9d2] px-4 py-3 outline-none focus:border-[#4e8a70]"
+          className="mt-2"
           placeholder={status.configured ? "Leave blank to keep the current key, or paste to replace it" : "Paste your ElevenLabs API Key"}
         />
       </label>
 
       <div className="mt-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-extrabold">Voice list (save several and switch during Listening)</span>
-          <span className="text-xs text-[#819087]">Up to {MAX_VOICES} · the first is the default</span>
+          <span className="text-sm font-extrabold text-ink">Voice list (save several and switch during Listening)</span>
+          <span className="text-xs text-faint">Up to {MAX_VOICES} · the first is the default</span>
         </div>
         <div className="mt-3 space-y-3">
           {voices.map((voice, index) => (
-            <div key={index} className="rounded-xl border border-[#e3e9e3] bg-[#fbfcfa] p-3">
+            <div key={index} className="rounded-control border border-line bg-[#fbfcfa] p-3">
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
                 <label>
-                  <span className="text-xs font-extrabold text-[#6b7b74]">Name{index === 0 ? " (default)" : ""}</span>
-                  <input
+                  <span className="text-xs font-extrabold text-muted">Name{index === 0 ? " (default)" : ""}</span>
+                  <Input
                     value={voice.name}
                     onChange={(event) => updateVoice(index, { name: event.target.value })}
                     autoComplete="off"
                     spellCheck={false}
                     placeholder={`Voice ${index + 1}`}
-                    className="mt-1.5 w-full rounded-lg border border-[#cfd9d2] px-3 py-2 text-sm outline-none focus:border-[#4e8a70]"
+                    className="mt-1.5 px-3 py-2"
                   />
                 </label>
                 <label>
-                  <span className="text-xs font-extrabold text-[#6b7b74]">Voice ID</span>
-                  <input
+                  <span className="text-xs font-extrabold text-muted">Voice ID</span>
+                  <Input
                     value={voice.voiceId}
                     onChange={(event) => updateVoice(index, { voiceId: event.target.value })}
                     autoComplete="off"
                     spellCheck={false}
                     placeholder="e.g. JBFqnCBsd6RMkjVDRZzb"
-                    className="mt-1.5 w-full rounded-lg border border-[#cfd9d2] px-3 py-2 font-mono text-sm outline-none focus:border-[#4e8a70]"
+                    className="mt-1.5 px-3 py-2 font-mono"
                   />
                 </label>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button
+                <Button
+                  variant="secondary"
+                  size="sm"
                   type="button"
                   onClick={() => preview(index)}
                   disabled={busy || previewing !== null || !voice.voiceId.trim()}
-                  className="rounded-lg border border-[#b9c9bf] bg-white px-3 py-2 text-xs font-extrabold text-[#315f4f] transition hover:bg-[#edf5ef] disabled:opacity-50"
                 >
                   {previewing === index ? "Previewing…" : "Preview"}
-                </button>
+                </Button>
                 {voices.length > 1 && (
-                  <button
+                  <Button
+                    variant="danger"
+                    size="sm"
                     type="button"
                     onClick={() => removeVoice(index)}
                     disabled={busy}
-                    className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 transition hover:bg-red-50 disabled:opacity-50"
                   >
                     Remove
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -312,49 +315,54 @@ export function ElevenLabsPanel({
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {voices.length < MAX_VOICES && (
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               type="button"
               onClick={addVoice}
               disabled={busy}
-              className="rounded-lg border border-dashed border-[#b9c9bf] px-4 py-2 text-sm font-bold text-[#315f4f] transition hover:bg-[#edf5ef] disabled:opacity-50"
+              className="border-dashed"
             >
               + Add voice
-            </button>
+            </Button>
           )}
           {status.configured && (
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               type="button"
               onClick={importVoices}
               disabled={busy || importing}
-              className="rounded-lg border border-[#b9c9bf] bg-white px-4 py-2 text-sm font-bold text-[#315f4f] transition hover:bg-[#edf5ef] disabled:opacity-50"
             >
               {importing ? "Importing…" : "Import my usable voices"}
-            </button>
+            </Button>
           )}
         </div>
         {status.configured && (
-          <p className="mt-2 text-xs leading-5 text-[#819087]">
+          <p className="mt-2 text-xs leading-5 text-faint">
             “Import my usable voices” pulls every voice your saved key is allowed to use, so you never hit a plan-permission error. Then tap Save.
           </p>
         )}
 
-        <div className="mt-4 rounded-xl border border-[#e3e9e3] bg-[#f8faf7] p-3">
-          <p className="text-xs font-extrabold text-[#6b7b74]">Quick add by accent</p>
-          <p className="mt-1 text-xs leading-5 text-[#819087]">Add a stock voice, then tap Preview to confirm the accent before saving. Switch voices per play from the Voice dropdown while reviewing.</p>
+        <div className="mt-4 rounded-control border border-line bg-[#f8faf7] p-3">
+          <p className="text-xs font-extrabold text-muted">Quick add by accent</p>
+          <p className="mt-1 text-xs leading-5 text-faint">Add a stock voice, then tap Preview to confirm the accent before saving. Switch voices per play from the Voice dropdown while reviewing.</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {ACCENT_PRESETS.flatMap((group) =>
               group.voices.map((preset) => {
                 const added = voices.some((voice) => voice.voiceId.trim() === preset.voiceId);
                 return (
-                  <button
+                  <Button
                     key={preset.voiceId}
+                    variant="secondary"
+                    size="sm"
                     type="button"
                     onClick={() => addPresetVoice(preset)}
                     disabled={busy || added || voices.length >= MAX_VOICES}
-                    className="rounded-lg border border-[#b9c9bf] bg-white px-3 py-1.5 text-xs font-bold text-[#315f4f] transition hover:bg-[#edf5ef] disabled:opacity-40"
+                    className="py-1.5"
                   >
                     {added ? "✓ " : "+ "}{preset.name}
-                  </button>
+                  </Button>
                 );
               }),
             )}
@@ -363,27 +371,28 @@ export function ElevenLabsPanel({
       </div>
 
       <label className="mt-5 block sm:max-w-xs">
-        <span className="text-sm font-extrabold">Model</span>
-        <input
+        <span className="text-sm font-extrabold text-ink">Model</span>
+        <Input
           value={modelId}
           onChange={(event) => setModelId(event.target.value)}
           autoComplete="off"
           spellCheck={false}
-          className="mt-2 w-full rounded-xl border border-[#cfd9d2] px-4 py-3 outline-none focus:border-[#4e8a70]"
+          className="mt-2"
         />
       </label>
 
       <div className="mt-5 flex flex-wrap gap-3">
-        <button
+        <Button
+          variant="primary"
           type="button"
           onClick={saveConfiguration}
           disabled={busy || !modelId.trim() || !voices.some((voice) => voice.voiceId.trim()) || (!status.configured && !apiKey.trim())}
-          className="rounded-xl bg-[#172223] px-5 py-3 font-bold text-white disabled:opacity-50"
         >
           {busy ? "Processing…" : "Save configuration"}
-        </button>
+        </Button>
         {status.configured && (
-          <button
+          <Button
+            variant="danger"
             type="button"
             onClick={async () => {
               if (!window.confirm("Delete the saved ElevenLabs API Key?")) return;
@@ -410,23 +419,22 @@ export function ElevenLabsPanel({
               }
             }}
             disabled={busy}
-            className="rounded-xl border border-red-200 px-5 py-3 font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
           >
             Delete credentials
-          </button>
+          </Button>
         )}
       </div>
 
       {notice && (
-        <p className="mt-4 rounded-xl bg-[#f0f8f2] p-4 text-sm text-[#285e48]" role="status">
+        <Alert tone="success" role="status" className="mt-4">
           {notice}
-        </p>
+        </Alert>
       )}
       {error && (
-        <p className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-700" role="alert">
+        <Alert tone="error" role="alert" className="mt-4">
           {error}
-        </p>
+        </Alert>
       )}
-    </section>
+    </Card>
   );
 }
