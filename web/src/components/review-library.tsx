@@ -116,6 +116,15 @@ const statusLabels: Record<string, string> = {
   pending_confirmation: "Pending",
 };
 
+// Daily re-grading keeps the three buttons available after a save, so the button
+// matching the currently recorded rating gets a selected treatment (ring + check)
+// — otherwise a saved rating looks unsaved.
+const rateOptions: { result: AttemptResult; label: string; base: string; ring: string }[] = [
+  { result: "incorrect", label: "Forgot · try tomorrow", base: "border-[#e2b7ad] bg-[#fff8f6] text-[#944c3f] hover:bg-[#fcebe7]", ring: "ring-[#c87563]" },
+  { result: "partial", label: "Unsure · review soon", base: "border-[#dec991] bg-[#fffaf0] text-[#80631c] hover:bg-[#fbf1d6]", ring: "ring-[#c6a54e]" },
+  { result: "correct", label: "Got it · longer interval", base: "border-[#a9cbb7] bg-[#f1faf4] text-[#286247] hover:bg-[#e2f3e8]", ring: "ring-[#5a9b78]" },
+];
+
 function ExamplePlayButton({ id, text, playingId, onPlay }: { id: string; text: string; playingId: string; onPlay: (id: string, text: string) => void }) {
   const active = playingId === id;
   return <button
@@ -482,9 +491,10 @@ function ReviewCards({
             <fieldset disabled={state.submitting}>
               <legend className="text-sm font-extrabold text-[#41514b]">{lastRecorded ? "Rate again today (yesterday's “Got it” doesn't mean you remember today — update anytime)" : "How well did you recall it?"}</legend>
               <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" onClick={() => onSubmit(card, "incorrect")} className="rounded-lg border border-[#e2b7ad] bg-[#fff8f6] px-4 py-2.5 text-sm font-bold text-[#944c3f] transition hover:bg-[#fcebe7] disabled:cursor-wait disabled:opacity-55">Forgot · try tomorrow</button>
-                <button type="button" onClick={() => onSubmit(card, "partial")} className="rounded-lg border border-[#dec991] bg-[#fffaf0] px-4 py-2.5 text-sm font-bold text-[#80631c] transition hover:bg-[#fbf1d6] disabled:cursor-wait disabled:opacity-55">Unsure · review soon</button>
-                <button type="button" onClick={() => onSubmit(card, "correct")} className="rounded-lg border border-[#a9cbb7] bg-[#f1faf4] px-4 py-2.5 text-sm font-bold text-[#286247] transition hover:bg-[#e2f3e8] disabled:cursor-wait disabled:opacity-55">Got it · longer interval</button>
+                {rateOptions.map((option) => {
+                  const isCurrent = lastRecorded === option.result;
+                  return <button key={option.result} type="button" aria-pressed={isCurrent} onClick={() => onSubmit(card, option.result)} className={`rounded-lg border px-4 py-2.5 text-sm font-bold transition disabled:cursor-wait disabled:opacity-55 ${option.base} ${isCurrent ? `ring-2 ring-offset-1 ${option.ring}` : ""}`}>{isCurrent ? "✓ " : ""}{option.label}{isCurrent ? " · saved" : ""}</button>;
+                })}
               </div>
               {state.submitting && <p aria-live="polite" className="mt-3 text-sm font-bold text-[#4e8a70]">Saving your rating…</p>}
             </fieldset>
