@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getElevenLabsStatus, type ElevenLabsVoice } from "@/lib/elevenlabs";
+import { normalizeElevenLabsMetadata, type ElevenLabsVoice } from "@/lib/elevenlabs";
 import { ReviewLibrary, type ReviewLibraryData } from "@/components/review-library";
 
 type JsonObject = Record<string, unknown>;
@@ -65,7 +65,10 @@ export default async function ReviewPage() {
   const accountLabel = user.email?.split("@", 1)[0]?.trim() || "User";
 
   const admin = createAdminClient();
-  const [{ data: spaces, error: spacesError }, { data: reviews, error: reviewsError }, { data: conversationItems, error: conversationItemsError }] = await Promise.all([
+  // One round-trip per data source, all in parallel — including both optional
+  // voice/story integrations in a single credentials query so navigation doesn't
+  // pay for extra sequential Supabase calls.
+  const [{ data: spaces, error: spacesError }, { data: reviews, error: reviewsError }, { data: conversationItems, error: conversationItemsError }, { data: integrationRows }] = await Promise.all([
     admin
       .from("knowledge_spaces")
       .select("id,display_name")
@@ -84,13 +87,21 @@ export default async function ReviewPage() {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(100),
+    admin
+      .from("integration_credentials")
+      .select("provider,metadata")
+      .eq("user_id", user.id)
+      .in("provider", ["elevenlabs", "deepseek"]),
   ]);
   let elevenLabsVoices: ElevenLabsVoice[] = [];
-  try {
-    const status = await getElevenLabsStatus(user.id);
-    if (status.configured) elevenLabsVoices = status.metadata.voices;
-  } catch {
-    // Voice switching is optional; a missing/failed integration must not break review.
+  let deepSeekConfigured = false;
+  for (const row of integrationRows ?? []) {
+    try {
+      if (row.provider === "elevenlabs") elevenLabsVoices = normalizeElevenLabsMetadata(row.metadata).voices;
+      else if (row.provider === "deepseek") deepSeekConfigured = true;
+    } catch {
+      // A malformed integration row must never break the review page.
+    }
   }
   let structuredLoadError = Boolean(spacesError || reviewsError || conversationItemsError);
   if (spacesError) console.error("Review knowledge-space query failed", spacesError);
@@ -302,7 +313,7 @@ export default async function ReviewPage() {
           <p className="max-w-sm text-sm leading-6 text-[#596861]">Recall first, then check. Your self-rating decides when it shows up next.</p>
         </header>
         {libraries.length ? (
-          <ReviewLibrary libraries={libraries} loadWarning={structuredLoadError} elevenLabsVoices={elevenLabsVoices} />
+          <ReviewLibrary libraries={libraries} loadWarning={structuredLoadError} elevenLabsVoices={elevenLabsVoices} deepSeekConfigured={deepSeekConfigured} />
         ) : (
           <section className="mt-8 rounded-2xl border border-[#dce4dc] bg-white p-10 text-center">
             <h2 className="text-xl font-black">No review categories yet</h2>
