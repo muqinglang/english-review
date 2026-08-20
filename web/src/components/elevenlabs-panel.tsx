@@ -15,7 +15,7 @@ export type ElevenLabsPanelStatus = {
   metadata: { voiceId: string; modelId: string; voices: Voice[] };
 };
 
-const MAX_VOICES = 10;
+const MAX_VOICES = 24;
 
 // Long-standing ElevenLabs stock voices grouped by accent. Preview uses the
 // user's own key, so they can confirm the accent before saving.
@@ -119,8 +119,9 @@ export function ElevenLabsPanel({
   }
 
   // Pull the voices the saved key can actually use (server-side call to
-  // /v1/voices) and add the ones not already listed, up to the cap. This removes
-  // the guesswork of which Voice IDs the learner's plan is allowed to synthesize.
+  // /v1/voices), merge them into the list up to the cap, AND persist in the same
+  // click — so "import all my usable voices" is truly one action, no separate
+  // Save. Removes the guesswork of which Voice IDs the plan is allowed to use.
   async function importVoices() {
     setImporting(true);
     setError("");
@@ -137,28 +138,43 @@ export function ElevenLabsPanel({
         setNotice("No voices were found on your ElevenLabs account.");
         return;
       }
-      let addedCount = 0;
-      let available = 0;
-      setVoices((current) => {
-        const kept = current.filter((voice) => voice.voiceId.trim());
-        const existing = new Set(kept.map((voice) => voice.voiceId.trim()));
-        const additions = fetched.filter((voice) => voice.voiceId && !existing.has(voice.voiceId));
-        available = additions.length;
-        const merged = [...kept];
-        for (const voice of additions) {
-          if (merged.length >= MAX_VOICES) break;
+
+      const kept = voices
+        .map((voice) => ({ voiceId: voice.voiceId.trim(), name: voice.name.trim() }))
+        .filter((voice) => voice.voiceId);
+      const existing = new Set(kept.map((voice) => voice.voiceId));
+      const merged = [...kept];
+      for (const voice of fetched) {
+        if (merged.length >= MAX_VOICES) break;
+        if (voice.voiceId && !existing.has(voice.voiceId)) {
           merged.push({ voiceId: voice.voiceId, name: (voice.name || "Voice").slice(0, 40) });
-          addedCount += 1;
+          existing.add(voice.voiceId);
         }
-        return merged.length ? merged : current;
-      });
-      if (addedCount === 0) {
-        setNotice("Your usable ElevenLabs voices are already in the list.");
-      } else if (addedCount < available) {
-        setNotice(`Added ${addedCount} voice${addedCount > 1 ? "s" : ""} (list is full at ${MAX_VOICES}). Review and tap “Save configuration”.`);
-      } else {
-        setNotice(`Added ${addedCount} usable voice${addedCount > 1 ? "s" : ""}. Review the list and tap “Save configuration”.`);
       }
+      const addedCount = merged.length - kept.length;
+      setVoices(merged);
+
+      // Persist right away so the imported voices actually stick.
+      const saveResponse = await fetch("/api/integrations/elevenlabs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ voices: merged, modelId }),
+      });
+      const saveBody = await saveResponse.json().catch(() => ({}));
+      if (!saveResponse.ok) {
+        setError(saveBody.message ?? "Imported the voices but couldn't save them. Tap “Save configuration”.");
+        return;
+      }
+      setStatus(saveBody as ElevenLabsPanelStatus);
+      setVoices(saveBody.metadata.voices);
+      setModelId(saveBody.metadata.modelId);
+      setLoadError(false);
+      const total = saveBody.metadata.voices.length;
+      setNotice(
+        addedCount > 0
+          ? `Imported and saved ${addedCount} more voice${addedCount > 1 ? "s" : ""} — ${total} total${total >= MAX_VOICES ? ` (capped at ${MAX_VOICES})` : ""}. Pick one per play on the Listening tab.`
+          : `Your usable ElevenLabs voices are already saved (${total} total).`,
+      );
     } catch {
       setError("Could not reach the settings service. Check your connection and try again.");
     } finally {
@@ -340,7 +356,7 @@ export function ElevenLabsPanel({
         </div>
         {status.configured && (
           <p className="mt-2 text-xs leading-5 text-faint">
-            “Import my usable voices” pulls every voice your saved key is allowed to use, so you never hit a plan-permission error. Then tap Save.
+            “Import my usable voices” pulls every voice your saved key is allowed to use and saves them in one tap, so you never hit a plan-permission error — then switch between them per play on the Listening tab.
           </p>
         )}
 

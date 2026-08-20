@@ -9,7 +9,7 @@ import {
 export const ELEVENLABS_PROVIDER = "elevenlabs";
 export const DEFAULT_ELEVENLABS_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
 export const DEFAULT_ELEVENLABS_MODEL_ID = "eleven_flash_v2_5";
-export const MAX_ELEVENLABS_VOICES = 10;
+export const MAX_ELEVENLABS_VOICES = 24;
 
 // A brand-new ElevenLabs setup ships with both a British and an American stock
 // voice so the per-play voice picker is useful immediately. The first entry is
