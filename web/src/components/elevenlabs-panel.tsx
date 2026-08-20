@@ -33,6 +33,34 @@ const ACCENT_PRESETS: { accent: string; voices: Voice[] }[] = [
   },
 ];
 
+// ElevenLabs' current default (premade) voices. These are public, stable IDs
+// that every plan — including free — can synthesize with a Text-to-Speech key,
+// so they work even when the key isn't allowed to LIST voices via /v1/voices.
+const DEFAULT_VOICE_CATALOG: Voice[] = [
+  { voiceId: "JBFqnCBsd6RMkjVDRZzb", name: "George · British" },
+  { voiceId: "onwK4e9ZLuTAKqWW03F9", name: "Daniel · British" },
+  { voiceId: "Xb7hH8MSUJpSbSDYk0k2", name: "Alice · British" },
+  { voiceId: "pFZP5JQG7iQjIQuC4Bku", name: "Lily · British" },
+  { voiceId: "IKne3meq5aSn9XLyUdCD", name: "Charlie · Australian" },
+  { voiceId: "21m00Tcm4TlvDq8ikWAM", name: "Rachel · American" },
+  { voiceId: "pNInz6obpgDQGcFmaJgB", name: "Adam · American" },
+  { voiceId: "9BWtsMINqrJLrRacOk9x", name: "Aria · American" },
+  { voiceId: "CwhRBWXzGAHq8TQ4Fs17", name: "Roger · American" },
+  { voiceId: "EXAVITQu4vr4xnSDxMaL", name: "Sarah · American" },
+  { voiceId: "FGY2WhTYpPnrIDTdsKH5", name: "Laura · American" },
+  { voiceId: "N2lVS1w4EtoT3dr4eOWO", name: "Callum · American" },
+  { voiceId: "SAz9YHcvj6GT2YYXdXww", name: "River · American" },
+  { voiceId: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam · American" },
+  { voiceId: "XB0fDUnXU5powFXDhCwa", name: "Charlotte · English" },
+  { voiceId: "XrExE9yKIg1WjnnlVkGX", name: "Matilda · American" },
+  { voiceId: "bIHbv24MWmeRgasZH58o", name: "Will · American" },
+  { voiceId: "cgSgspJ2msm6clMCkdW9", name: "Jessica · American" },
+  { voiceId: "cjVigY5qzO86Huf0OWal", name: "Eric · American" },
+  { voiceId: "iP95p4xoKVk53GoZ742B", name: "Chris · American" },
+  { voiceId: "nPczCjzI2devNBz1zQrb", name: "Brian · American" },
+  { voiceId: "pqHfZKP75CvOlQylNhV4", name: "Bill · American" },
+];
+
 export function ElevenLabsPanel({
   initialStatus,
   initialLoadError = false,
@@ -127,16 +155,23 @@ export function ElevenLabsPanel({
     setError("");
     setNotice("");
     try {
-      const response = await fetch("/api/integrations/elevenlabs/voices");
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setError(body.message ?? "Couldn't load your ElevenLabs voices. Save your API key first, then try again.");
-        return;
+      // Try to list the account's voices. If the key is scoped to Text-to-Speech
+      // only (can list nothing) or the call fails, fall back to the built-in
+      // default catalog — every plan can still synthesize those.
+      let fetched: { voiceId: string; name: string }[] = [];
+      let usedFallback = false;
+      try {
+        const response = await fetch("/api/integrations/elevenlabs/voices");
+        const body = await response.json().catch(() => ({}));
+        if (response.ok && Array.isArray(body.voices) && body.voices.length) {
+          fetched = body.voices as { voiceId: string; name: string }[];
+        }
+      } catch {
+        // fall through to the default catalog
       }
-      const fetched = (Array.isArray(body.voices) ? body.voices : []) as { voiceId: string; name: string }[];
       if (!fetched.length) {
-        setNotice("No voices were found on your ElevenLabs account.");
-        return;
+        fetched = DEFAULT_VOICE_CATALOG;
+        usedFallback = true;
       }
 
       const kept = voices
@@ -170,10 +205,11 @@ export function ElevenLabsPanel({
       setModelId(saveBody.metadata.modelId);
       setLoadError(false);
       const total = saveBody.metadata.voices.length;
+      const source = usedFallback ? "the default voice set" : "your account";
       setNotice(
         addedCount > 0
-          ? `Imported and saved ${addedCount} more voice${addedCount > 1 ? "s" : ""} — ${total} total${total >= MAX_VOICES ? ` (capped at ${MAX_VOICES})` : ""}. Pick one per play on the Listening tab.`
-          : `Your usable ElevenLabs voices are already saved (${total} total).`,
+          ? `Added and saved ${addedCount} voice${addedCount > 1 ? "s" : ""} from ${source} — ${total} total${total >= MAX_VOICES ? ` (capped at ${MAX_VOICES})` : ""}. Preview any below, then pick one per play on the Listening tab.`
+          : `Your voices are already saved (${total} total).`,
       );
     } catch {
       setError("Could not reach the settings service. Check your connection and try again.");
@@ -350,13 +386,13 @@ export function ElevenLabsPanel({
               onClick={importVoices}
               disabled={busy || importing}
             >
-              {importing ? "Importing…" : "Import my usable voices"}
+              {importing ? "Importing…" : "Import voices"}
             </Button>
           )}
         </div>
         {status.configured && (
           <p className="mt-2 text-xs leading-5 text-faint">
-            “Import my usable voices” pulls every voice your saved key is allowed to use and saves them in one tap, so you never hit a plan-permission error — then switch between them per play on the Listening tab.
+            “Import voices” adds ElevenLabs’ full default voice set (and any others your key can list) and saves them in one tap — it works even if your key is Text-to-Speech-only. Switch between them per play on the Listening tab.
           </p>
         )}
 
