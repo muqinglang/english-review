@@ -55,15 +55,25 @@ export async function deleteDeepSeekConfiguration(userId: string): Promise<DeepS
   return { configured: false, keySuffix: null, metadata: normalizeDeepSeekMetadata({}) };
 }
 
-// Weave the learner's due review words into one short, natural story for a
-// listening/dictation exercise. Kept short so the downstream TTS endpoint (which
-// caps free text) can voice the whole thing in a single clip.
+export type StoryTarget = { expression: string; meaning?: string };
+
+// Weave a FEW of the learner's target expressions into one short, natural story
+// for listening/dictation. The goal is a story a real person would actually tell,
+// not a bag of vocabulary — so we pass only 3-5 expressions and tell the model to
+// prioritise natural flow over cramming. Kept short for the TTS clip.
 export async function generateListeningStory(
   credential: { apiKey: string; metadata: DeepSeekMetadata },
-  words: string[],
+  targetsInput: StoryTarget[],
 ): Promise<string> {
-  const targets = words.map((word) => word.trim()).filter(Boolean).slice(0, 20);
+  const targets = targetsInput
+    .map((target) => ({ expression: target.expression.trim(), meaning: target.meaning?.trim() }))
+    .filter((target) => target.expression)
+    .slice(0, 5);
   if (!targets.length) throw new Error("No review words to build a story from.");
+
+  const targetLines = targets
+    .map((target) => `- ${target.expression}${target.meaning ? ` (${target.meaning})` : ""}`)
+    .join("\n");
 
   const response = await fetch("https://api.deepseek.com/chat/completions", {
     method: "POST",
@@ -77,14 +87,14 @@ export async function generateListeningStory(
         {
           role: "system",
           content:
-            "You are an English tutor writing short listening-practice stories for an intermediate (B1-B2) learner. Write ONE natural, coherent story of 60-90 words that uses every target word or phrase at least once, in clear everyday English suitable for a dictation exercise. Return only the story text: no title, no word list, no markdown, no quotation marks, no explanations.",
+            "You are an English tutor writing SHORT, natural listening-practice stories for an intermediate (B1-B2) learner. Write ONE cohesive little story (about 70-110 words) that a real person might actually tell: a small everyday moment with a clear beginning and end, in warm, conversational, everyday English suitable for listening dictation. Weave the target expressions in ONLY where they fit naturally, using the core English phrase of each at least once. Prioritise a natural, human-sounding story over including every expression — it is fine to skip one if it would force an awkward sentence. Never sound like a list of vocabulary. Return ONLY the story text: no title, no word list, no markdown, no quotation marks, no explanations.",
         },
         {
           role: "user",
-          content: `Target words/phrases to include: ${targets.join(", ")}`,
+          content: `Write the story. Try to naturally include these target expressions (use the English phrase in each):\n${targetLines}`,
         },
       ],
-      temperature: 0.8,
+      temperature: 0.85,
       max_tokens: 400,
       stream: false,
     }),

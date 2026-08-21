@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-const MAX_TEXT_LENGTH = 600;
+const MAX_TEXT_LENGTH = 900;
 type TtsProvider = "fish_audio" | "elevenlabs";
 
 // Free-text speech for review example sentences (and other on-page prose that is

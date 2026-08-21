@@ -6,8 +6,7 @@ export const runtime = "nodejs";
 
 // Keep in sync with /api/tts/speak MAX_TEXT_LENGTH so the generated story can
 // always be voiced in a single clip by the learner's TTS provider.
-const MAX_STORY_LENGTH = 600;
-const MAX_WORDS = 20;
+const MAX_STORY_LENGTH = 900;
 
 function isUuid(value: unknown): value is string {
   return (
@@ -61,27 +60,35 @@ export async function POST(request: Request) {
 
   const { data: learningItems, error: learningError } = await admin
     .from("learning_items")
-    .select("id,cue")
+    .select("normalized_key,answer")
     .eq("user_id", user.id)
     .in("id", learningItemIds);
   if (learningError) {
     return Response.json({ message: "Unable to load this review's words." }, { status: 500 });
   }
 
-  // `cue` holds the English word/phrase being learned (the front of each card).
+  // Pool of target expressions (the English key phrase) plus a short gloss.
   const seen = new Set<string>();
-  const words: string[] = [];
+  const pool: { expression: string; meaning?: string }[] = [];
   for (const item of learningItems ?? []) {
-    const word = typeof item.cue === "string" ? item.cue.trim() : "";
-    const key = word.toLowerCase();
-    if (!word || seen.has(key)) continue;
+    const expression = typeof item.normalized_key === "string" ? item.normalized_key.trim() : "";
+    const key = expression.toLowerCase();
+    if (!expression || seen.has(key)) continue;
     seen.add(key);
-    words.push(word);
-    if (words.length >= MAX_WORDS) break;
+    const meaning = typeof item.answer === "string" ? item.answer.trim().slice(0, 120) : "";
+    pool.push(meaning ? { expression, meaning } : { expression });
   }
-  if (!words.length) {
+  if (!pool.length) {
     return Response.json({ message: "This review has no words to build a story from yet." }, { status: 422 });
   }
+
+  // Shuffle and take only 3-5 so the story stays natural (and varies per tap)
+  // instead of cramming every expression in.
+  for (let i = pool.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const targets = pool.slice(0, Math.min(pool.length, 3 + Math.floor(Math.random() * 3)));
 
   const credential = await getDeepSeekCredential(user.id);
   if (!credential) {
@@ -90,7 +97,7 @@ export async function POST(request: Request) {
 
   let story: string;
   try {
-    story = await generateListeningStory(credential, words);
+    story = await generateListeningStory(credential, targets);
   } catch {
     return Response.json(
       { message: "The story writer is temporarily unavailable. Please try again later." },
@@ -101,7 +108,7 @@ export async function POST(request: Request) {
   if (story.length > MAX_STORY_LENGTH) story = story.slice(0, MAX_STORY_LENGTH).trim();
 
   return Response.json(
-    { story, words },
+    { story, expressions: targets.map((target) => target.expression) },
     { headers: { "cache-control": "no-store" } },
   );
 }
