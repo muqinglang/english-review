@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeElevenLabsMetadata, type ElevenLabsVoice } from "@/lib/elevenlabs";
+import { ensureTodayReview } from "@/lib/daily-review";
 import { ReviewLibrary, type ReviewLibraryData } from "@/components/review-library";
 import { AppShell, AccountChip, NavIconLink } from "@/components/ui/app-shell";
 
@@ -63,6 +64,10 @@ export default async function ReviewPage() {
   if (!token || !user) redirect("/login");
 
   const accountLabel = user.email?.split("@", 1)[0]?.trim() || "User";
+
+  // Materialize today's review from due items before loading, so the daily review
+  // appears automatically (computed from the SRS schedule) with no manual push.
+  await ensureTodayReview(user.id);
 
   const admin = createAdminClient();
   // One round-trip per data source, all in parallel — including both optional
