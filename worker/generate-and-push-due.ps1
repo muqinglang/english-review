@@ -64,7 +64,18 @@ function Get-EnglishSentence($item) {
 }
 
 $encodedSpace = [Uri]::EscapeDataString($Space)
-$context = Invoke-RestMethod -Uri "$ApiBase/api/worker/context?space=$encodedSpace" -Headers @{ Authorization = "Bearer $token" } -TimeoutSec $TimeoutSec
+# Read the response bytes and decode as UTF-8 explicitly. Invoke-RestMethod on
+# Windows PowerShell 5.1 decodes as Latin-1 when no charset is on the response,
+# which corrupts Chinese (and any bytes we then re-push).
+Add-Type -AssemblyName System.Net.Http
+$httpClient = [Net.Http.HttpClient]::new()
+$httpClient.Timeout = [TimeSpan]::FromSeconds($TimeoutSec)
+$httpClient.DefaultRequestHeaders.Authorization = [Net.Http.Headers.AuthenticationHeaderValue]::new("Bearer", $token)
+$httpResp = $httpClient.GetAsync("$ApiBase/api/worker/context?space=$encodedSpace").GetAwaiter().GetResult()
+$ctxJson = [Text.Encoding]::UTF8.GetString($httpResp.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult())
+$httpClient.Dispose()
+if (-not $httpResp.IsSuccessStatusCode) { throw "Worker context HTTP $([int]$httpResp.StatusCode): $ctxJson" }
+$context = $ctxJson | ConvertFrom-Json
 if (-not $context.ok -or -not $context.schedule) { throw "Worker context did not return a schedule." }
 
 # Only items the server considers selectable for a fresh review that also give us
